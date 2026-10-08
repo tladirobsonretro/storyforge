@@ -563,23 +563,6 @@ async function createStory(){
   toast("Story forged successfully.");
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
-// Explicitly bind DOM IDs and actions so every tool button works consistently across browsers.
-[
- "toolPanel","toolTitle","toolHint","worldForm","worldName","worldTone","worldPremise","worldSetting",
- "characterForm","charName","charRole","charPersonality","charAppearance","charGoal","characterReferenceButton",
- "characterLibrary","storyboardForm","boardTitle","boardEpisode","boardEpisodeTitle","boardPremise","sceneForm",
- "scenePremise","sceneWorld","sceneCharacters","videoForm","videoTitle","videoFormat","videoShots","videoDuration",
- "videoCaptions","videoGenerateButton","assetForm","assetType","assetStyle","assetSubject","assetMood","assetNotes",
- "generateImageButton","toolOutput","idea","generate","results","resultTitle","logline","saveProjectButton",
- "world","characters","episodes","shots","projectCount","projects","toast"
-].forEach(function(id) { window[id] = document.getElementById(id); });
-Object.assign(window, {
- showSavedStories, readProjects, focusPrompt, saveProject, renderProjects, loadProject, renderStory, initWorkspace,
- showTool, generateScene, buildWorld, getStoryBible, saveStoryBible, characterId, escapeHtml,
- migrateLegacyCharacter, renderCharacterLibrary, loadCharacter, generateCharacterReference,
- saveCharacterReference, removeCharacterReference, buildCharacter, buildStoryboard, buildVideoPlan,
- generateVideo, buildAsset, generateImage, copyText, toast, createStory
-});
 migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary();
 </script><script src="/story-create.js?v=2"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js"></script></body></html>`);
 });
