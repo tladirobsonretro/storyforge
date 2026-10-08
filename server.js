@@ -164,9 +164,10 @@ function buildStoryboard(input) {
   const title = (input.title || "Untitled Story").trim();
   const episode = Number(input.episode || 1);
   const episodeTitle = (input.episodeTitle || "The Discovery").trim();
-  const premise = (input.premise || "the heroes discover something unexpected").trim();
+  const premise = (input.premise || (scene && scene.action) || "the heroes discover something unexpected").trim();
   const worldBible = (input.worldBible || "").trim();
   const characterBible = (input.characterBible || "").trim();
+  const scene = input.scene || null;
   const continuityPrefix = [worldBible && "WORLD BIBLE: " + worldBible, characterBible && "CHARACTER BIBLE: " + characterBible, "Maintain exact identity, proportions, wardrobe, signature accessories, environment geography, lighting language and colour palette across every shot."].filter(Boolean).join(" ");
   const templates = [
     ["01","Extreme wide establishing","Slow aerial push-in","Establish the location and the scale of the world before the action begins.","Ambient environment, distant birds and soft score.","4s","cinematic establishing frame; original characters; consistent world design"],
@@ -180,7 +181,7 @@ function buildStoryboard(input) {
   ];
   return {
     title, episode, episodeTitle, premise,
-    shots: templates.map((t,i)=>({number:i+1,shot:t[0],shotType:t[1],camera:t[2],action:t[3],audio:t[4],duration:t[5],visualPrompt:continuityPrefix + " " + t[6]})),
+    shots: templates.map((t,i)=>({number:i+1,shot:t[0],shotType:t[1],camera:t[2],action:(scene && scene.beats && scene.beats[i % scene.beats.length]) || t[3],audio:(scene && scene.dialogue && scene.dialogue[i % scene.dialogue.length] ? scene.dialogue[i % scene.dialogue.length].character + ": " + scene.dialogue[i % scene.dialogue.length].line : t[4]),duration:t[5],visualPrompt:continuityPrefix + " " + t[6]})),
     totalDuration:"29s",
     continuity:"Keep character identity, wardrobe, props, lighting, location geography and screen direction consistent across every shot." + (worldBible || characterBible ? " StoryForge continuity lock is active." : " Add a world and character bible to activate the continuity lock.")
   };
@@ -388,7 +389,7 @@ app.get("/", (req, res) => {
 <div class="result-box"><h4>Episode arc</h4><div id="episodes"></div></div><div class="result-box"><h4>Storyboard starter</h4><div id="shots" class="shots"></div></div>
 </div></section>
 <div class="section-head"><h3>Creative tools</h3><span>Build every layer of your story</span></div>
-<section class="cards"><div class="card clickable" onclick="showTool('world')"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card clickable" onclick="showTool('character')"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card clickable" onclick="showTool('storyboard')"><div class="icon">▤</div><h4>Storyboard Studio</h4><p>Break scenes into production-ready shots with camera, action, audio and continuity.</p></div><div class="card clickable" onclick="showTool('asset')"><div class="icon">◇</div><h4>Asset Studio</h4><p>Create structured visual briefs for characters, environments, props and scenes.</p></div><div class="card clickable" onclick="showTool('video')"><div class="icon">▶</div><h4>Video Forge</h4><p>Build the edit plan for shots, sound, captions and export format.</p></div></section>
+<section class="cards"><div class="card clickable" onclick="showTool('world')"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card clickable" onclick="showTool('character')"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card clickable" onclick="showTool('scene')"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card clickable" onclick="showTool('storyboard')"><div class="icon">▤</div><h4>Storyboard Studio</h4><p>Break scenes into production-ready shots with camera, action, audio and continuity.</p></div><div class="card clickable" onclick="showTool('asset')"><div class="icon">◇</div><h4>Asset Studio</h4><p>Create structured visual briefs for characters, environments, props and scenes.</p></div><div class="card clickable" onclick="showTool('video')"><div class="icon">▶</div><h4>Video Forge</h4><p>Build the edit plan for shots, sound, captions and export format.</p></div></section>
 <div class="section-head"><h3>Your projects</h3><span id="projectCount">Saved locally in this browser</span></div><section id="projects" class="projects"></section>
 </main></div><div class="toast" id="toast"></div>
 <script>
