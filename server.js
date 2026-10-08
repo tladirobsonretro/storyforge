@@ -164,10 +164,10 @@ function buildStoryboard(input) {
   const title = (input.title || "Untitled Story").trim();
   const episode = Number(input.episode || 1);
   const episodeTitle = (input.episodeTitle || "The Discovery").trim();
+  const scene = input.scene || null;
   const premise = (input.premise || (scene && scene.action) || "the heroes discover something unexpected").trim();
   const worldBible = (input.worldBible || "").trim();
   const characterBible = (input.characterBible || "").trim();
-  const scene = input.scene || null;
   const continuityPrefix = [worldBible && "WORLD BIBLE: " + worldBible, characterBible && "CHARACTER BIBLE: " + characterBible, "Maintain exact identity, proportions, wardrobe, signature accessories, environment geography, lighting language and colour palette across every shot."].filter(Boolean).join(" ");
   const templates = [
     ["01","Extreme wide establishing","Slow aerial push-in","Establish the location and the scale of the world before the action begins.","Ambient environment, distant birds and soft score.","4s","cinematic establishing frame; original characters; consistent world design"],
@@ -233,7 +233,7 @@ app.post("/api/video", async (req, res) => {
     const response = await fetch("https://gen.pollinations.ai/v1/videos/generations", {
       method: "POST",
       headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, duration, ...(req.body?.image ? { image: [req.body.image] } : {}) })
+      body: JSON.stringify({ model, prompt, duration, ...(req.body?.image ? { image: [req.body.image] } : {}), ...(Array.isArray(req.body?.referenceImages) && req.body.referenceImages.length ? { reference_images: req.body.referenceImages.slice(0, 3) } : {}) })
     });
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "Video generation failed." });
