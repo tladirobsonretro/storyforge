@@ -1,6 +1,7 @@
 (() => {
   let currentShots = [];
   let animatedClips = {};
+  let generatedFrames = {};
 
   window.buildStoryboard = async function () {
     const payload = {
@@ -24,6 +25,8 @@
     }
 
     currentShots = data.shots || [];
+    animatedClips = {};
+    generatedFrames = {};
     const output = document.getElementById("toolOutput");
     output.style.display = "block";
     output.innerHTML =
@@ -74,6 +77,7 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Frame generation failed.");
 
+        generatedFrames[shot.number] = data.url;
         frame.innerHTML =
           "<img src='" + data.url + "' alt='Shot " + shot.number + " frame' style='width:100%;max-height:520px;object-fit:cover;background:#080808;border:1px solid #292929;border-radius:10px'>" +
           "<div style='display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:8px'>" +
@@ -85,6 +89,7 @@
         frame.innerHTML = "<p style='color:#888;font-size:12px'>" + error.message + "</p>";
       }
     }
+    persistProductionState();
     toast("Shot frame pass complete.");
   };
 
@@ -113,6 +118,7 @@
       const holder = document.getElementById("shot-frame-" + number);
       holder.innerHTML += "<video controls playsinline data-shot-clip='" + number + "' src='" + data.url + "' style='width:100%;margin-top:10px;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video>";
       animatedClips[number] = data.url;
+      persistProductionState();
       updateAssemblyButton();
       status.textContent = "ANIMATION READY";
       toast("Shot " + number + " animated.");
@@ -161,6 +167,19 @@
     }
   };
 
+  function persistProductionState() {
+    try {
+      localStorage.setItem("storyforge-production-state", JSON.stringify({shots:currentShots,frames:generatedFrames,clips:animatedClips,scene:window.storyforgeScene||null}));
+    } catch (e) {}
+  }
+  window.restoreProductionState = function () {
+    try {
+      const state=JSON.parse(localStorage.getItem("storyforge-production-state")||"null");
+      if(!state||!Array.isArray(state.shots)||!state.shots.length)return;
+      currentShots=state.shots; generatedFrames=state.frames||{}; animatedClips=state.clips||{};
+      if(state.scene) window.storyforgeScene=state.scene;
+    } catch(e) {}
+  };
   function updateAssemblyButton() {
     const button = document.getElementById("assembleVideoBtn");
     if (!button) return;
@@ -168,4 +187,5 @@
     button.disabled = count < 2;
     button.textContent = count ? "Assemble final video (" + count + ") →" : "Assemble final video →";
   }
+  restoreProductionState();
 })();
