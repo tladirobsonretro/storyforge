@@ -39,5 +39,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(\`StoryForge running on port \${PORT}\`);
+  console.log(`StoryForge running on port ${PORT}`);
 });
