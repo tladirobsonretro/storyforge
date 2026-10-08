@@ -2,6 +2,7 @@
   let currentShots = [];
   let animatedClips = {};
   let generatedFrames = {};
+  try { window.storyforgeCharacterReferenceImage = window.storyforgeCharacterReferenceImage || localStorage.getItem("storyforge-character-reference") || null; } catch (e) {}
 
   window.buildStoryboard = async function () {
     const payload = {
