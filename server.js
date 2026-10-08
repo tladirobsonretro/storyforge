@@ -258,10 +258,23 @@ app.post("/api/assemble", async (req, res) => {
       fs.writeFileSync(file, Buffer.from(await response.arrayBuffer()));
       files.push(file);
     }
+    const normalized = [];
+    for (let i = 0; i < files.length; i++) {
+      const normalizedFile = path.join(dir, "normalized-" + String(i + 1).padStart(3, "0") + ".mp4");
+      await new Promise((resolve, reject) => execFile(ffmpegPath, [
+        "-y","-i",files[i],
+        "-vf","scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
+        "-r","30","-c:v","libx264","-preset","veryfast","-crf","23",
+        "-c:a","aac","-ar","48000","-ac","2","-b:a","128k","-movflags","+faststart",normalizedFile
+      ], {timeout:180000}, (error) => error ? reject(error) : resolve()));
+      normalized.push(normalizedFile);
+    }
     const list = path.join(dir, "concat.txt");
-    fs.writeFileSync(list, files.map(f => "file '" + f.replace(/'/g, "'\\''") + "'").join("\n"));
+    fs.writeFileSync(list, normalized.map(f => "file '" + f.replace(/'/g, "'\\''") + "'").join("\n"));
     const output = path.join(dir, "storyforge-final.mp4");
-    await new Promise((resolve, reject) => execFile(ffmpegPath, ["-y","-f","concat","-safe","0","-i",list,"-c","copy",output], {timeout:120000}, (error) => error ? reject(error) : resolve()));
+    await new Promise((resolve, reject) => execFile(ffmpegPath, [
+      "-y","-f","concat","-safe","0","-i",list,"-c","copy","-movflags","+faststart",output
+    ], {timeout:180000}, (error) => error ? reject(error) : resolve()));
     res.setHeader("Content-Type", "video/mp4");
     res.sendFile(output, () => fs.rmSync(dir, { recursive: true, force: true }));
   } catch (error) {
