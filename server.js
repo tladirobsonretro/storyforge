@@ -343,7 +343,7 @@ app.get("/", (req, res) => {
 </head>
 <body><div class="app">
 <aside class="sidebar"><div class="logo">StoryForge <span>AI</span></div><nav class="nav">
-<button class="active" onclick="showTool('dashboard')">⌂ &nbsp; Dashboard</button><button onclick="showTool('world')">◈ &nbsp; Worlds</button><button onclick="showTool('character')">● &nbsp; Characters</button><button onclick="showTool('asset')">◇ &nbsp; Assets</button><button onclick="showTool('storyboard')">▤ &nbsp; Storyboard</button><button>▣ &nbsp; Stories</button><button onclick="showTool('video')">▶ &nbsp; Videos</button>
+<button class="active" onclick="showTool('dashboard')">⌂ &nbsp; Dashboard</button><button onclick="showTool('world')">◈ &nbsp; Worlds</button><button onclick="showTool('character')">● &nbsp; Characters</button><button onclick="showTool('asset')">◇ &nbsp; Assets</button><button onclick="showTool('storyboard')">▤ &nbsp; Storyboard</button><button onclick="showSavedStories()">▣ &nbsp; Stories</button><button onclick="showTool('video')">▶ &nbsp; Videos</button>
 </nav><div class="side-bottom">Create once. Build a universe.</div></aside>
 <main class="main">
 <section id="toolPanel" class="results" style="margin-top:0;margin-bottom:28px">
@@ -410,10 +410,27 @@ app.get("/", (req, res) => {
 </main></div><div class="toast" id="toast"></div>
 <script>
 let currentStory=null;
+function showSavedStories(){
+ const panel=document.getElementById("toolPanel");
+ panel.classList.remove("show");
+ document.getElementById("results").classList.add("show");
+ const projects=readProjects();
+ if(!projects.length){toast("No saved stories yet. Create a story, then click Save project.");return}
+ document.getElementById("resultTitle").textContent="Saved stories";
+ document.getElementById("logline").textContent="Select a saved story below to reopen it.";
+ document.getElementById("world").textContent="";
+ document.getElementById("characters").innerHTML="";
+ document.getElementById("episodes").innerHTML="";
+ document.getElementById("shots").innerHTML="";
+ document.getElementById("projects").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function readProjects(){try{const value=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");return Array.isArray(value)?value:[]}catch(e){return []}}
+window.addEventListener("error",function(e){const t=document.getElementById("toast");if(t){t.textContent="App error: "+(e.message||"unknown error");t.style.display="block"}});
+window.addEventListener("unhandledrejection",function(e){const t=document.getElementById("toast");if(t){t.textContent="Action failed: "+(e.reason?.message||String(e.reason||"unknown error"));t.style.display="block"}});
 function focusPrompt(){document.getElementById("idea").focus()}
-function saveProject(){if(!currentStory){toast("Create a story before saving.");return}const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");projects.unshift({id:Date.now(),title:currentStory.title,idea:currentStory.idea,data:currentStory.data});localStorage.setItem("storyforge-projects",JSON.stringify(projects.slice(0,20)));renderProjects();toast("Project saved.")}
-function renderProjects(){const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");document.getElementById("projectCount").textContent=projects.length+" saved locally in this browser";document.getElementById("projects").innerHTML=projects.map(p=>"<div class='project' onclick='loadProject("+p.id+")' style='cursor:pointer'><div><strong>"+p.title+"</strong><small>"+p.idea+"</small></div><span class='status'>OPEN</span></div>").join("")+"<div class='project'><div><strong>StoryForge pipeline</strong><small>World → Character → Story → Asset → Storyboard → Video</small></div><span class='status'>BUILDING</span></div>"}
-function loadProject(id){const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");const p=projects.find(x=>x.id===id);if(p){renderStory(p.data,p.idea);toast("Project loaded.")}}
+function saveProject(){if(!currentStory){toast("Create a story before saving.");return}const projects=readProjects();projects.unshift({id:Date.now(),title:currentStory.title,idea:currentStory.idea,data:currentStory.data});try{localStorage.setItem("storyforge-projects",JSON.stringify(projects.slice(0,20)))}catch(e){toast("Could not save locally. Browser storage may be full.");return}renderProjects();toast("Project saved.")}
+function renderProjects(){const projects=readProjects();document.getElementById("projectCount").textContent=projects.length+" saved locally in this browser";document.getElementById("projects").innerHTML=projects.map(p=>"<div class='project' onclick='loadProject("+p.id+")' style='cursor:pointer'><div><strong>"+p.title+"</strong><small>"+p.idea+"</small></div><span class='status'>OPEN</span></div>").join("")+"<div class='project'><div><strong>StoryForge pipeline</strong><small>World → Character → Story → Asset → Storyboard → Video</small></div><span class='status'>BUILDING</span></div>"}
+function loadProject(id){const projects=readProjects();const p=projects.find(x=>x.id===id);if(p){renderStory(p.data,p.idea);toast("Project loaded.")}}
 function renderStory(data,idea){currentStory={title:data.title,idea:idea,data:data};document.getElementById("resultTitle").textContent=data.title;document.getElementById("logline").textContent=data.logline;document.getElementById("world").textContent=data.world;document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");document.getElementById("episodes").innerHTML=data.episodes.map(e=>"<div class='episode'><strong>"+e.number+". "+e.title+"</strong><span>"+e.summary+"</span></div>").join("");document.getElementById("shots").innerHTML=data.scenes.map(s=>"<div class='shot'><b>SHOT "+s.shot+"</b><div>"+s.camera+"</div><div>"+s.action+"</div></div>").join("");document.getElementById("results").classList.add("show")}
 function initWorkspace(){renderProjects()}
 function showTool(tool){
@@ -534,7 +551,7 @@ async function generateImage(){
 async function copyText(value){try{await navigator.clipboard.writeText(value);toast("Prompt copied.");}catch(e){toast("Copy unavailable. Select the prompt manually.")}}
 function toast(message){const t=document.getElementById("toast");t.textContent=message;t.style.display="block";setTimeout(()=>t.style.display="none",2600)}
 async function createStory(){
- const input=document.getElementById("idea"), button=document.getElementById("generate"), value=input.value.trim();
+ const input=document.getElementById("idea"), button=document.getElementById("generate"); if(!input||!button){toast("Story form failed to load. Refresh the page.");return} const value=input.value.trim();
  if(!value){toast("Give us an idea first.");focusPrompt();return}
  button.disabled=true;button.textContent="Forging story…";
  try{
