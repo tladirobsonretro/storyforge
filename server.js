@@ -448,6 +448,34 @@ function getStoryBible(){try{return JSON.parse(localStorage.getItem("storyforge-
 function saveStoryBible(bible){try{localStorage.setItem("storyforge-story-bible",JSON.stringify(bible))}catch(e){}}
 function characterId(name){return String(name||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||String(Date.now())}
 function escapeHtml(value){return String(value||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]||c))}
+function migrateLegacyCharacter(){
+ const bible=getStoryBible();
+ if(Array.isArray(bible.characters)&&bible.characters.length)return false;
+ let legacyData=window.storyforgeCharacterData||null;
+ const legacyReference=localStorage.getItem("storyforge-character-reference")||"";
+ const fields={
+  name:typeof charName!=="undefined"?charName.value.trim():"",
+  role:typeof charRole!=="undefined"?charRole.value.trim():"",
+  personality:typeof charPersonality!=="undefined"?charPersonality.value.trim():"",
+  appearance:typeof charAppearance!=="undefined"?charAppearance.value.trim():"",
+  goal:typeof charGoal!=="undefined"?charGoal.value.trim():""
+ };
+ if(!legacyData&&window.storyforgeCharacterBible){
+  const parts=String(window.storyforgeCharacterBible).split(" | ");
+  legacyData={name:fields.name||parts[0]||"Recovered Character",role:fields.role||parts[1]||"character",personality:fields.personality||parts[2]||"curious and determined",appearance:fields.appearance||parts[3]||"distinctive recurring character design",goal:fields.goal||(parts.find(x=>x.indexOf("GOAL: ")===0)||"").replace(/^GOAL:\s*/,"")||"discover the truth",strength:(parts.find(x=>x.indexOf("STRENGTH: ")===0)||"").replace(/^STRENGTH:\s*/,"")||"Sees possibilities where others see obstacles.",flaw:(parts.find(x=>x.indexOf("FLAW: ")===0)||"").replace(/^FLAW:\s*/,"")||"Sometimes acts before understanding the consequences.",arc:(parts.find(x=>x.indexOf("ARC: ")===0)||"").replace(/^ARC:\s*/,"")||"Learns when to trust others."};
+ }
+ if(!legacyData&&!legacyReference)return false;
+ const data=legacyData||{};
+ const name=(data.name||fields.name||"Recovered Character").trim();
+ const recovered={id:characterId(name),name,role:(data.role||fields.role||"character").trim(),personality:(data.personality||fields.personality||"curious and determined").trim(),appearance:(data.appearance||fields.appearance||"distinctive recurring character design").trim(),goal:(data.goal||fields.goal||"discover the truth").trim(),strength:data.strength||"Sees possibilities where others see obstacles.",flaw:data.flaw||"Sometimes acts before understanding the consequences.",arc:data.arc||"Learns when to trust others.",updatedAt:new Date().toISOString(),...(data.referenceImage?{referenceImage:data.referenceImage}:legacyReference?{referenceImage:legacyReference}:{}),migratedFromLegacy:true};
+ bible.characters=[recovered];
+ saveStoryBible(bible);
+ window.storyforgeCharacterId=recovered.id;
+ window.storyforgeCharacterData=recovered;
+ window.storyforgeCharacterBible=[recovered.name,recovered.role,recovered.personality,recovered.appearance,"GOAL: "+recovered.goal,"STRENGTH: "+recovered.strength,"FLAW: "+recovered.flaw,"ARC: "+recovered.arc].join(" | ");
+ window.storyforgeCharacterReferenceImage=recovered.referenceImage||"";
+ return true;
+}
 function renderCharacterLibrary(){const el=document.getElementById("characterLibrary");if(!el)return;const bible=getStoryBible(),chars=Array.isArray(bible.characters)?bible.characters:[];if(!chars.length){el.innerHTML="<h4>Character Bible</h4><p style='color:#666;font-size:12px'>Forged characters will be saved here and remain available for future stories.</p>";return}el.innerHTML="<h4>Character Bible</h4><div style='display:grid;gap:10px'>"+chars.map(ch=>"<div class='shot' style='padding:14px;display:flex;gap:14px;align-items:center'>"+(ch.referenceImage?"<img src='"+escapeHtml(ch.referenceImage)+"' style='width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid #292929'>":"<div style='width:74px;height:74px;border:1px solid #292929;border-radius:8px;display:grid;place-items:center;color:#666'>NO REF</div>")+"<div style='flex:1'><strong>"+escapeHtml(ch.name)+"</strong><div style='color:#888;font-size:12px;margin-top:4px'>"+escapeHtml(ch.role)+"</div><div style='color:#666;font-size:11px;margin-top:5px'>"+(ch.referenceImage?"Reference saved":"Reference not saved yet")+"</div></div><button class='copy-btn' onclick='loadCharacter(\""+escapeHtml(ch.id)+"\")'>Load</button></div>").join("")+"</div>"}
 function loadCharacter(id){const bible=getStoryBible(),ch=(bible.characters||[]).find(x=>x.id===id);if(!ch){toast("Character not found.");return}charName.value=ch.name||"";charRole.value=ch.role||"";charPersonality.value=ch.personality||"";charAppearance.value=ch.appearance||"";charGoal.value=ch.goal||"";window.storyforgeCharacterId=ch.id;window.storyforgeCharacterData=ch;window.storyforgeCharacterBible=[ch.name,ch.role,ch.personality,ch.appearance,"GOAL: "+ch.goal,"STRENGTH: "+ch.strength,"FLAW: "+ch.flaw,"ARC: "+ch.arc].join(" | ");window.storyforgeCharacterReferenceImage=ch.referenceImage||"";toolOutput.style.display="block";toolOutput.innerHTML="<h4>Character loaded</h4><p><strong>"+escapeHtml(ch.name)+"</strong> · "+escapeHtml(ch.role)+"</p><p>"+escapeHtml(ch.personality)+"</p>"+(ch.referenceImage?"<img src='"+escapeHtml(ch.referenceImage)+"' style='width:100%;max-height:600px;object-fit:contain;background:#080808;border:1px solid #292929;border-radius:10px;margin-top:12px'>":"<p style='color:#888'>No reference sheet saved yet.</p>")+"<div style='display:flex;gap:8px;margin-top:10px'><button class='copy-btn' onclick='generateCharacterReference()'>Regenerate reference sheet →</button></div>";document.getElementById("characterReferenceButton").style.display="inline-block";toast(ch.name+" loaded.")}
 async function generateCharacterReference(){const bible=window.storyforgeCharacterBible||"";if(!bible){toast("Forge or load the character first.");return}const button=document.getElementById("characterReferenceButton");button.disabled=true;button.textContent="Generating reference sheet…";try{const prompt="Original recurring animation character reference sheet. "+bible+". Show the exact same character in full-body front view, 3/4 view and side view on a clean neutral background. Clear silhouette, readable face, consistent proportions, wardrobe and signature accessories. No text, no logos, no existing franchise style. This is a continuity reference for future StoryForge scenes.";const response=await fetch("/api/image",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,size:"1024x1024"})});const data=await response.json();if(!response.ok)throw new Error(data.error||"Reference generation failed.");window.storyforgeCharacterReferencePreview=data.url;toolOutput.style.display="block";const referenceHtml="<div id='characterReferencePanel' style='margin-top:18px'><h4>Reference sheet preview</h4><img src='"+escapeHtml(data.url)+"' style='width:100%;max-height:600px;object-fit:contain;background:#080808;border:1px solid #292929;border-radius:10px'><div style='display:flex;gap:8px;align-items:center;margin-top:10px'><button class='copy-btn' onclick='generateCharacterReference()'>Regenerate →</button><button class='copy-btn' onclick='saveCharacterReference()'>Save this reference</button></div><p style='color:#666;font-size:11px'>Preview only. Regenerate until you like it, then save it to this character's Story Bible.</p></div>";const existing=document.getElementById("characterReferencePanel");if(existing)existing.outerHTML=referenceHtml;else toolOutput.innerHTML+=referenceHtml;toast("Reference preview generated. Save it if you like it.");}catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Regenerate reference sheet →"}}
@@ -518,7 +546,7 @@ async function createStory(){
   toast("Story forged successfully.");
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
-initWorkspace(); renderCharacterLibrary();
+migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary();
 </script><script src="/storyboard-board.js"></script></body></html>`);
 });
 
