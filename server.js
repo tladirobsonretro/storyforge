@@ -400,7 +400,7 @@ app.get("/", (req, res) => {
 </section>
 <div class="top"><div><div class="eyebrow">Creator workspace</div><h1>Bring a story to life.</h1></div><button class="new" onclick="focusPrompt()">+ New story</button></div>
 <section class="hero"><h2>What are we creating?</h2><p>Start with an idea. StoryForge turns the premise into a structured story world.</p><div class="prompt"><input id="idea" placeholder="A young explorer discovers an island that appears once every hundred years..." /><button id="generate" class="generate" onclick="createStory()">Create story →</button></div></section>
-<section id="results" class="results"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><h2 id="resultTitle" class="result-title"></h2><p id="logline" class="logline"></p></div><button class="new" onclick="saveProject()">Save project</button></div><div class="result-grid">
+<section id="results" class="results"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><h2 id="resultTitle" class="result-title"></h2><p id="logline" class="logline"></p></div><button id="saveProjectButton" class="new" type="button" onclick="saveProject()">Save project</button></div><div class="result-grid">
 <div class="result-box"><h4>World</h4><p id="world"></p></div><div class="result-box"><h4>Characters</h4><div id="characters"></div></div>
 <div class="result-box"><h4>Episode arc</h4><div id="episodes"></div></div><div class="result-box"><h4>Storyboard starter</h4><div id="shots" class="shots"></div></div>
 </div></section>
@@ -564,7 +564,7 @@ async function createStory(){
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
 migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary();
-</script><script src="/story-create.js?v=2"></script><script src="/storyboard-board.js"></script></body></html>`);
+</script><script src="/story-create.js?v=2"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js"></script></body></html>`);
 });
 
 app.listen(PORT, () => console.log(`StoryForge running on port ${PORT}`));
