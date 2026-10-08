@@ -98,6 +98,22 @@ function buildAsset(input) {
   };
 }
 
+app.post("/api/scene", async (req, res) => {
+  const input = req.body || {};
+  const premise = (input.premise || "").trim();
+  const characters = (input.characters || "").trim();
+  const world = (input.world || "").trim();
+  if (!premise) return res.status(400).json({ error: "A scene premise is required." });
+  if (!process.env.POLLINATIONS_API_KEY) return res.json({title:"Scene: "+premise.slice(0,48),location:world||"Story world",action:"The characters investigate the situation, make a meaningful choice and discover a new clue.",dialogue:[{character:"Hero",line:"Something here is not what it seems."},{character:"Companion",line:"Then we should find out what it is."}],beats:["Establish the location","Introduce the problem","Character choice","Discovery","Hook for the next scene"]});
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {method:"POST",headers:{"Authorization":"Bearer "+process.env.POLLINATIONS_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:"openai",messages:[{role:"system",content:"Write original family-safe animated scenes. Return ONLY JSON with title, location, action, dialogue, beats. dialogue is an array of character and line. Keep dialogue short and natural."},{role:"user",content:"World: "+world+"\nCharacters: "+characters+"\nScene premise: "+premise}],temperature:0.85})});
+    const data = await response.json();
+    if (!response.ok) throw new Error("Scene model failed");
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content || "");
+    if (!parsed.title || !Array.isArray(parsed.dialogue) || !Array.isArray(parsed.beats)) throw new Error("Incomplete scene");
+    res.json(parsed);
+  } catch (error) { res.status(502).json({error:"Scene generation failed. Please try again."}); }
+});
 app.post("/api/world", (req, res) => {
   if (!req.body) return res.status(400).json({ error: "World details are required." });
   res.json(buildWorld(req.body));
