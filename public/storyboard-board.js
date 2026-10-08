@@ -172,6 +172,28 @@
       localStorage.setItem("storyforge-production-state", JSON.stringify({shots:currentShots,frames:generatedFrames,clips:animatedClips,scene:window.storyforgeScene||null}));
     } catch (e) {}
   }
+  window.renderRestoredProduction = function () {
+    if (!currentShots.length) return;
+    const output = document.getElementById("toolOutput");
+    if (!output) return;
+    output.style.display = "block";
+    output.innerHTML = "<div style='display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap'><div><h4>Restored production board</h4><p style='color:#888'>Your previous storyboard production state was restored from this browser.</p></div><button class='copy-btn' onclick='generateStoryboardFrames()'>Regenerate missing frames →</button></div><div id='storyboardBoard' style='display:grid;gap:12px;margin-top:14px'>" + currentShots.map(shotCard).join("") + "</div>";
+    currentShots.forEach(function(shot){
+      const frame = generatedFrames[shot.number];
+      const clip = animatedClips[shot.number];
+      const holder = document.getElementById("shot-frame-" + shot.number);
+      const status = document.getElementById("shot-status-" + shot.number);
+      if (frame) {
+        holder.innerHTML = "<img src='" + frame + "' alt='Shot " + shot.number + " frame' style='width:100%;max-height:520px;object-fit:cover;background:#080808;border:1px solid #292929;border-radius:10px'><div style='color:#666;font-size:11px;margin-top:8px'>Restored frame</div>";
+        status.textContent = clip ? "ANIMATION READY" : "FRAME READY";
+      }
+      if (clip) {
+        holder.innerHTML += "<video controls playsinline src='" + clip + "' style='width:100%;margin-top:10px;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video>";
+      }
+    });
+    updateAssemblyButton();
+  };
+
   window.restoreProductionState = function () {
     try {
       const state=JSON.parse(localStorage.getItem("storyforge-production-state")||"null");
@@ -188,4 +210,5 @@
     button.textContent = count ? "Assemble final video (" + count + ") →" : "Assemble final video →";
   }
   restoreProductionState();
+  setTimeout(renderRestoredProduction, 50);
 })();
