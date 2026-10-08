@@ -1,113 +1,20 @@
 (() => {
-  "use strict";
-  const KEY = "storyforge-projects";
-  function toast(message) {
-    const el = document.getElementById("toast");
-    if (el) {
-      el.textContent = message;
-      el.style.display = "block";
-    } else {
-      window.alert(message);
-    }
-  }
-  function getSaved() {
-    const raw = localStorage.getItem(KEY);
-    const value = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(value)) throw new Error("Saved projects data is invalid.");
-    return value;
-  }
-  function refreshProjectList(projects) {
-    const count = document.getElementById("projectCount");
-    const list = document.getElementById("projects");
-    if (count) count.textContent = projects.length + " saved locally in this browser";
-    if (!list) return;
-    list.replaceChildren();
-    projects.forEach((project) => {
-      const row = document.createElement("div");
-      row.className = "project";
-      row.style.cursor = "pointer";
-      row.tabIndex = 0;
-      const details = document.createElement("div");
-      const title = document.createElement("strong");
-      title.textContent = project.title || "Untitled story";
-      const idea = document.createElement("small");
-      idea.textContent = project.idea || "";
-      details.append(title, idea);
-      const status = document.createElement("span");
-      status.className = "status";
-      status.textContent = "OPEN";
-      row.append(details, status);
-      const open = () => {
-        if (typeof window.renderStory === "function" && project.data) {
-          window.renderStory(project.data, project.idea || "");
-          document.getElementById("results")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          toast("Saved story opened.");
-        } else toast("This saved item cannot be opened.");
-      };
-      row.addEventListener("click", open);
-      row.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); }
-      });
-      list.appendChild(row);
-    });
-    const pipeline = document.createElement("div");
-    pipeline.className = "project";
-    const info = document.createElement("div");
-    const heading = document.createElement("strong");
-    heading.textContent = "StoryForge pipeline";
-    const subtitle = document.createElement("small");
-    subtitle.textContent = "World → Character → Story → Asset → Storyboard → Video";
-    info.append(heading, subtitle);
-    const status = document.createElement("span");
-    status.className = "status";
-    status.textContent = "BUILDING";
-    pipeline.append(info, status);
-    list.appendChild(pipeline);
-  }
-  function saveCurrentStory(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    const story = window.currentStory || null;
-    const title = document.getElementById("resultTitle")?.textContent?.trim();
-    const idea = document.getElementById("idea")?.value?.trim() || "";
-    const world = document.getElementById("world")?.textContent || "";
-    const characterNodes = [...(document.getElementById("characters")?.children || [])];
-    const episodeNodes = [...(document.getElementById("episodes")?.children || [])];
-    const shotNodes = [...(document.getElementById("shots")?.children || [])];
-    if (!title || (!story && !world && !characterNodes.length && !episodeNodes.length && !shotNodes.length)) {
-      toast("Create a story before saving it.");
-      return;
-    }
-    const data = story?.data || {
-      title,
-      logline: document.getElementById("logline")?.textContent || "",
-      world,
-      characters: characterNodes.map((el) => ({ name: el.querySelector("strong")?.textContent || "", role: el.querySelector("span")?.textContent || "" })),
-      episodes: episodeNodes.map((el) => ({ title: el.querySelector("strong")?.textContent || "", summary: el.querySelector("span")?.textContent || "" })),
-      scenes: shotNodes.map((el) => ({ shot: el.querySelector("b, strong")?.textContent || "", action: el.textContent || "" }))
-    };
-    const savedIdea = story?.idea || idea || title;
-    try {
-      const projects = getSaved();
-      const item = { id: Date.now(), title, idea: savedIdea, data, savedAt: new Date().toISOString() };
-      projects.unshift(item);
-      const next = projects.slice(0, 20);
-      localStorage.setItem(KEY, JSON.stringify(next));
-      const verified = getSaved();
-      if (!verified.some((p) => p.id === item.id)) throw new Error("Browser did not confirm the save.");
-      refreshProjectList(verified);
-      toast("Project saved on this device.");
-    } catch (error) {
-      toast("Save failed: " + (error?.message || "browser storage is unavailable."));
-    }
-  }
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest && event.target.closest("#saveProjectButton");
-    if (button) saveCurrentStory(event);
-  }, true);
-  document.addEventListener("DOMContentLoaded", () => {
-    try { refreshProjectList(getSaved()); }
-    catch (error) { toast("Could not read saved projects: " + (error?.message || "storage error")); }
-  });
+"use strict";
+const KEY="storyforge-projects";
+function toast(m){const e=document.getElementById("toast");if(e){e.textContent=m;e.style.display="block"}else alert(m)}
+function saved(){const a=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(a))throw Error("Saved projects data is invalid.");return a}
+function openStory(p){
+ const d=p.data||{}, byId=id=>document.getElementById(id), set=(id,v)=>{byId(id).textContent=v||""};
+ set("resultTitle",d.title||p.title);set("logline",d.logline);
+ const w=d.world;set("world",typeof w==="string"?w:w?JSON.stringify(w,null,2):"");
+ const render=(id,items,kind)=>{const root=byId(id);root.replaceChildren();(Array.isArray(items)?items:[]).forEach((x,i)=>{const row=document.createElement("div");row.className=kind;const h=document.createElement(kind==="shot"?"b":"strong");h.textContent=kind==="shot"?"SHOT "+(x.shot||i+1):(x.number?x.number+". ":"")+ (x.name||x.title||"");const detail=document.createElement(kind==="shot"?"div":"span");detail.textContent=kind==="shot"?(x.camera||x.shotType||"")+" "+(x.action||""):(x.role||x.summary||"");row.append(h,detail);root.appendChild(row)})};
+ render("characters",d.characters,"episode");render("episodes",d.episodes,"episode");render("shots",d.scenes,"shot");
+ byId("results").classList.add("show");byId("results").scrollIntoView({behavior:"smooth",block:"start"});toast("Saved story opened.")
+}
+function refresh(a){const c=document.getElementById("projectCount"),list=document.getElementById("projects");if(c)c.textContent=a.length+" saved locally in this browser";if(!list)return;list.replaceChildren();a.forEach(p=>{const row=document.createElement("div");row.className="project";row.style.cursor="pointer";row.tabIndex=0;const d=document.createElement("div"),h=document.createElement("strong"),s=document.createElement("small"),status=document.createElement("span");h.textContent=p.title||"Untitled story";s.textContent=p.idea||"";status.className="status";status.textContent="OPEN";d.append(h,s);row.append(d,status);row.onclick=()=>openStory(p);row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openStory(p)}};list.appendChild(row)});const pipe=document.createElement("div");pipe.className="project";pipe.textContent="StoryForge pipeline · World → Character → Story → Asset → Storyboard → Video";list.appendChild(pipe)}
+function save(e){e.preventDefault();e.stopImmediatePropagation();const q=id=>document.getElementById(id),title=q("resultTitle")?.textContent?.trim();if(!title){toast("Create a story before saving it.");return}
+ const data={title,logline:q("logline")?.textContent||"",world:q("world")?.textContent||"",characters:[...(q("characters")?.children||[])].map(x=>({name:x.querySelector("strong")?.textContent||"",role:x.querySelector("span")?.textContent||""})),episodes:[...(q("episodes")?.children||[])].map((x,i)=>({number:i+1,title:x.querySelector("strong")?.textContent?.replace(/^\d+\.\s*/,"")||"",summary:x.querySelector("span")?.textContent||""})),scenes:[...(q("shots")?.children||[])].map((x,i)=>({shot:x.querySelector("b")?.textContent?.replace(/^SHOT\s*/,"")||String(i+1),camera:x.querySelector("div")?.textContent||"",action:[...x.querySelectorAll("div")].slice(1).map(v=>v.textContent).join(" ")}))};
+ try{const p={id:Date.now(),title,idea:q("idea")?.value?.trim()||title,data};const a=[p,...saved()].slice(0,20);localStorage.setItem(KEY,JSON.stringify(a));const check=saved();if(!check.some(x=>x.id===p.id))throw Error("Save could not be verified");refresh(check);toast("Project saved on this device.")}catch(err){toast("Save failed: "+(err.message||"browser storage unavailable"))}}
+document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#saveProjectButton"))save(e)},true);
+document.addEventListener("DOMContentLoaded",()=>{try{refresh(saved())}catch(e){toast("Could not read saved projects: "+e.message)}});
 })();
