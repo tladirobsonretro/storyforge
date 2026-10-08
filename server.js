@@ -456,10 +456,20 @@ async function generateCharacterReference(){
   if(!response.ok) throw new Error(data.error||"Reference generation failed.");
   window.storyforgeCharacterReferenceImage=data.url;
   toolOutput.style.display="block";
-  toolOutput.innerHTML += "<h4 style='margin-top:18px'>Character continuity reference</h4><img src='"+data.url+"' alt='Character reference sheet' style='width:100%;max-height:600px;object-fit:contain;background:#080808;border:1px solid #292929;border-radius:10px'><p style='color:#666;font-size:11px'>This reference will be supplied to animation shots as a continuity guide.</p>";
+  const referenceHtml="<div id='characterReferencePanel' style='margin-top:18px'><h4>Character continuity reference</h4><img src='"+data.url+"' alt='Character reference sheet' style='width:100%;max-height:600px;object-fit:contain;background:#080808;border:1px solid #292929;border-radius:10px'><div style='display:flex;gap:8px;align-items:center;margin-top:10px'><button class='copy-btn' onclick='generateCharacterReference()'>Regenerate reference sheet →</button><button class='copy-btn' onclick='removeCharacterReference()'>Remove reference</button></div><p style='color:#666;font-size:11px'>One active reference is used for continuity. Regenerating replaces the previous reference.</p></div>";
+  const existing=document.getElementById("characterReferencePanel");
+  if(existing) existing.outerHTML=referenceHtml;
+  else toolOutput.innerHTML += referenceHtml;
   try{localStorage.setItem("storyforge-character-reference",data.url)}catch(e){}
-  toast("Character reference locked.");
+  toast("Character reference replaced.");
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Regenerate reference sheet →"}
+}
+function removeCharacterReference(){
+ window.storyforgeCharacterReferenceImage="";
+ try{localStorage.removeItem("storyforge-character-reference")}catch(e){}
+ const panel=document.getElementById("characterReferencePanel");
+ if(panel) panel.remove();
+ toast("Character reference removed.");
 }
 async function buildCharacter(){
  const payload={name:charName.value,role:charRole.value,personality:charPersonality.value,appearance:charAppearance.value,goal:charGoal.value};
