@@ -161,6 +161,20 @@ function buildStoryboard(input) {
   };
 }
 
+app.post("/api/shot-frame", async (req, res) => {
+  if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({error:"Image generation is not connected yet. Add POLLINATIONS_API_KEY in Render."});
+  const prompt=(req.body?.prompt||"").trim();
+  if(!prompt) return res.status(400).json({error:"A shot prompt is required."});
+  try {
+    const response=await fetch("https://gen.pollinations.ai/v1/images/generations",{method:"POST",headers:{"Authorization":"Bearer "+process.env.POLLINATIONS_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:"flux",prompt,response_format:"url",size:req.body?.size||"1024x1024"})});
+    const data=await response.json();
+    if(!response.ok) return res.status(response.status).json({error:data.error?.message||"Frame generation failed."});
+    const url=data.data?.[0]?.url||data.data?.[0]?.b64_json;
+    if(!url) return res.status(502).json({error:"No frame returned."});
+    res.json({url,model:"flux"});
+  } catch(e) { res.status(502).json({error:"Image provider could not be reached."}); }
+});
+
 app.post("/api/storyboard", (req, res) => {
   if (!req.body) return res.status(400).json({ error: "Storyboard details are required." });
   res.json(buildStoryboard(req.body));
