@@ -109,6 +109,7 @@
         body: JSON.stringify({
           prompt: shot.visualPrompt + "; " + shot.action + "; " + shot.camera + "; preserve the exact character and environment shown in the reference frame; smooth cinematic motion",
           image: frame.src,
+          referenceImages: window.storyforgeCharacterReferenceImage ? [window.storyforgeCharacterReferenceImage] : [],
           model: "alibaba/wan-2.2-fast",
           duration: Math.min(10, Math.max(2, parseInt(shot.duration, 10) || 4))
         })
@@ -169,7 +170,7 @@
 
   function persistProductionState() {
     try {
-      localStorage.setItem("storyforge-production-state", JSON.stringify({shots:currentShots,frames:generatedFrames,clips:animatedClips,scene:window.storyforgeScene||null}));
+      localStorage.setItem("storyforge-production-state", JSON.stringify({shots:currentShots,frames:generatedFrames,clips:animatedClips,scene:window.storyforgeScene||null,characterReferenceImage:window.storyforgeCharacterReferenceImage||null}));
     } catch (e) {}
   }
   window.renderRestoredProduction = function () {
@@ -200,6 +201,7 @@
       if(!state||!Array.isArray(state.shots)||!state.shots.length)return;
       currentShots=state.shots; generatedFrames=state.frames||{}; animatedClips=state.clips||{};
       if(state.scene) window.storyforgeScene=state.scene;
+      if(state.characterReferenceImage) window.storyforgeCharacterReferenceImage=state.characterReferenceImage;
     } catch(e) {}
   };
   function updateAssemblyButton() {
