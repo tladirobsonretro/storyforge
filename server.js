@@ -370,7 +370,7 @@ app.get("/", (req, res) => {
     </div>
     <button class="generate tool-action" onclick="buildStoryboard()">Forge storyboard →</button>
   </div>
-  <div id="videoForm" style="display:none">
+  <div id="sceneForm" style="display:none"><div class="result-grid"><div class="result-box"><h4>Scene premise</h4><textarea id="scenePremise" class="tool-input" rows="4" placeholder="The heroes discover a strange signal beneath the old lighthouse."></textarea></div><div class="result-box"><h4>World context</h4><textarea id="sceneWorld" class="tool-input" rows="4" placeholder="World details"></textarea></div><div class="result-box" style="grid-column:1/-1"><h4>Characters</h4><textarea id="sceneCharacters" class="tool-input" rows="3" placeholder="Character names, roles and personalities"></textarea></div></div><button class="generate tool-action" onclick="generateScene()">Generate full scene →</button></div><div id="videoForm" style="display:none">
     <div class="result-grid">
       <div class="result-box"><h4>Video title</h4><input id="videoTitle" class="tool-input" placeholder="The Island That Appears Once a Century"></div>
       <div class="result-box"><h4>Format</h4><select id="videoFormat" class="tool-input"><option>YouTube Short</option><option>TikTok / Reels</option><option>Landscape episode</option></select></div>
@@ -411,16 +411,26 @@ function loadProject(id){const projects=JSON.parse(localStorage.getItem("storyfo
 function renderStory(data,idea){currentStory={title:data.title,idea:idea,data:data};document.getElementById("resultTitle").textContent=data.title;document.getElementById("logline").textContent=data.logline;document.getElementById("world").textContent=data.world;document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");document.getElementById("episodes").innerHTML=data.episodes.map(e=>"<div class='episode'><strong>"+e.number+". "+e.title+"</strong><span>"+e.summary+"</span></div>").join("");document.getElementById("shots").innerHTML=data.scenes.map(s=>"<div class='shot'><b>SHOT "+s.shot+"</b><div>"+s.camera+"</div><div>"+s.action+"</div></div>").join("");document.getElementById("results").classList.add("show")}
 function initWorkspace(){renderProjects()}
 function showTool(tool){
- const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), asset=document.getElementById("assetForm"), storyboard=document.getElementById("storyboardForm"), video=document.getElementById("videoForm"), output=document.getElementById("toolOutput");
+ const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), asset=document.getElementById("assetForm"), storyboard=document.getElementById("storyboardForm"), video=document.getElementById("videoForm"), scene=document.getElementById("sceneForm"), output=document.getElementById("toolOutput");
  if(tool==="dashboard"){panel.classList.remove("show");return}
  panel.classList.add("show"); output.style.display="none";
  world.style.display=tool==="world"?"block":"none";
  character.style.display=tool==="character"?"block":"none";
  asset.style.display=tool==="asset"?"block":"none";
- storyboard.style.display=tool==="storyboard"?"block":"none"; video.style.display=tool==="video"?"block":"none";
- document.getElementById("toolTitle").textContent=tool==="world"?"World Builder":tool==="character"?"Character Forge":tool==="asset"?"Asset Studio":tool==="storyboard"?"Storyboard Studio":"Video Forge";
- document.getElementById("toolHint").textContent=tool==="world"?"Shape the rules of your universe":tool==="character"?"Create a recurring character":tool==="asset"?"Prepare consistent visual assets":tool==="storyboard"?"Turn a scene into production-ready shots":"Plan the final edit and export";
+ storyboard.style.display=tool==="storyboard"?"block":"none"; video.style.display=tool==="video"?"block":"none"; scene.style.display=tool==="scene"?"block":"none";
+ document.getElementById("toolTitle").textContent=tool==="world"?"World Builder":tool==="character"?"Character Forge":tool==="asset"?"Asset Studio":tool==="scene"?"Story Engine":tool==="storyboard"?"Storyboard Studio":"Video Forge";
+ document.getElementById("toolHint").textContent=tool==="world"?"Shape the rules of your universe":tool==="character"?"Create a recurring character":tool==="asset"?"Prepare consistent visual assets":tool==="scene"?"Write action, dialogue and story beats":tool==="storyboard"?"Turn a scene into production-ready shots":"Plan the final edit and export";
  panel.scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function generateScene(){
+ const premise=document.getElementById("scenePremise").value.trim();
+ if(!premise){toast("Give us a scene premise first.");return}
+ const response=await fetch("/api/scene",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({premise,world:document.getElementById("sceneWorld").value||window.storyforgeWorldBible||"",characters:document.getElementById("sceneCharacters").value||window.storyforgeCharacterBible||""})});
+ const data=await response.json();
+ if(!response.ok){toast(data.error||"Scene generation failed.");return}
+ const output=document.getElementById("toolOutput"); output.style.display="block";
+ output.innerHTML="<h3>"+data.title+"</h3><p><strong>Location:</strong> "+data.location+"</p><p>"+data.action+"</p><h4>Dialogue</h4>"+data.dialogue.map(d=>"<div class='episode'><strong>"+d.character+"</strong><span>"+d.line+"</span></div>").join("")+"<h4>Beats</h4><p>"+data.beats.map((b,i)=>(i+1)+". "+b).join("<br>")+"</p>";
+ window.storyforgeScene=data; toast("Scene generated.");
 }
 async function buildWorld(){
  const payload={name:worldName.value,premise:worldPremise.value,tone:worldTone.value,setting:worldSetting.value};
