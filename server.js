@@ -416,7 +416,7 @@ async function createStory(){
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
 initWorkspace();
-</script></body></html>`);
+</script><script src="/storyboard-board.js"></script></body></html>`);
 });
 
 app.listen(PORT, () => console.log(`StoryForge running on port ${PORT}`));
