@@ -166,6 +166,34 @@ app.post("/api/storyboard", (req, res) => {
   res.json(buildStoryboard(req.body));
 });
 
+function buildVideoPlan(input) {
+  const title = (input.title || "Untitled Video").trim();
+  const format = (input.format || "YouTube Short").trim();
+  const shots = Math.max(1, Math.min(30, Number(input.shots || 8)));
+  const duration = Math.max(1, Math.min(60, Number(input.duration || 29)));
+  const captions = input.captions !== false;
+  return {
+    title, format, shots, duration,
+    aspectRatio: format.toLowerCase().includes("landscape") ? "16:9" : "9:16",
+    resolution: "1080p",
+    captions,
+    audio: "Dialogue / voiceover + music + scene sound effects",
+    renderPlan: [
+      "Import storyboard frames in shot order.",
+      "Apply each shot duration and camera-motion direction.",
+      "Add dialogue, music and sound effects on separate tracks.",
+      captions ? "Generate timed captions from dialogue." : "Keep captions disabled.",
+      "Render a preview before final export."
+    ],
+    status: "EDIT_PLAN_READY"
+  };
+}
+
+app.post("/api/video-plan", (req, res) => {
+  if (!req.body) return res.status(400).json({ error: "Video details are required." });
+  res.json(buildVideoPlan(req.body));
+});
+
 app.post("/api/generate", (req, res) => {
   if (!req.body || !req.body.idea || !req.body.idea.trim()) {
     return res.status(400).json({ error: "Please provide a story idea." });
@@ -194,7 +222,7 @@ app.get("/", (req, res) => {
 </head>
 <body><div class="app">
 <aside class="sidebar"><div class="logo">StoryForge <span>AI</span></div><nav class="nav">
-<button class="active" onclick="showTool('dashboard')">⌂ &nbsp; Dashboard</button><button onclick="showTool('world')">◈ &nbsp; Worlds</button><button onclick="showTool('character')">● &nbsp; Characters</button><button onclick="showTool('asset')">◇ &nbsp; Assets</button><button onclick="showTool('storyboard')">▤ &nbsp; Storyboard</button><button>▣ &nbsp; Stories</button><button>▶ &nbsp; Videos</button>
+<button class="active" onclick="showTool('dashboard')">⌂ &nbsp; Dashboard</button><button onclick="showTool('world')">◈ &nbsp; Worlds</button><button onclick="showTool('character')">● &nbsp; Characters</button><button onclick="showTool('asset')">◇ &nbsp; Assets</button><button onclick="showTool('storyboard')">▤ &nbsp; Storyboard</button><button>▣ &nbsp; Stories</button><button onclick="showTool('video')">▶ &nbsp; Videos</button>
 </nav><div class="side-bottom">Create once. Build a universe.</div></aside>
 <main class="main">
 <section id="toolPanel" class="results" style="margin-top:0;margin-bottom:28px">
@@ -227,6 +255,16 @@ app.get("/", (req, res) => {
     </div>
     <button class="generate tool-action" onclick="buildStoryboard()">Forge storyboard →</button>
   </div>
+  <div id="videoForm" style="display:none">
+    <div class="result-grid">
+      <div class="result-box"><h4>Video title</h4><input id="videoTitle" class="tool-input" placeholder="The Island That Appears Once a Century"></div>
+      <div class="result-box"><h4>Format</h4><select id="videoFormat" class="tool-input"><option>YouTube Short</option><option>TikTok / Reels</option><option>Landscape episode</option></select></div>
+      <div class="result-box"><h4>Storyboard shots</h4><input id="videoShots" class="tool-input" type="number" min="1" max="30" value="8"></div>
+      <div class="result-box"><h4>Total duration (seconds)</h4><input id="videoDuration" class="tool-input" type="number" min="1" max="60" value="29"></div>
+      <div class="result-box"><h4>Captions</h4><select id="videoCaptions" class="tool-input"><option value="yes">Yes</option><option value="no">No</option></select></div>
+    </div>
+    <button class="generate tool-action" onclick="buildVideoPlan()">Build edit plan →</button>
+  </div>
   <div id="assetForm" style="display:none">
     <div class="result-grid">
       <div class="result-box"><h4>Asset type</h4><select id="assetType" class="tool-input"><option>character</option><option>environment</option><option>prop</option><option>scene</option></select></div>
@@ -246,7 +284,7 @@ app.get("/", (req, res) => {
 <div class="result-box"><h4>Episode arc</h4><div id="episodes"></div></div><div class="result-box"><h4>Storyboard starter</h4><div id="shots" class="shots"></div></div>
 </div></section>
 <div class="section-head"><h3>Creative tools</h3><span>Build every layer of your story</span></div>
-<section class="cards"><div class="card clickable" onclick="showTool('world')"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card clickable" onclick="showTool('character')"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card clickable" onclick="showTool('storyboard')"><div class="icon">▤</div><h4>Storyboard Studio</h4><p>Break scenes into production-ready shots with camera, action, audio and continuity.</p></div><div class="card clickable" onclick="showTool('asset')"><div class="icon">◇</div><h4>Asset Studio</h4><p>Create structured visual briefs for characters, environments, props and scenes.</p></div><div class="card"><div class="icon">▶</div><h4>Video Forge</h4><p>Assemble scenes into short-form episodes ready for review.</p></div></section>
+<section class="cards"><div class="card clickable" onclick="showTool('world')"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card clickable" onclick="showTool('character')"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card clickable" onclick="showTool('storyboard')"><div class="icon">▤</div><h4>Storyboard Studio</h4><p>Break scenes into production-ready shots with camera, action, audio and continuity.</p></div><div class="card clickable" onclick="showTool('asset')"><div class="icon">◇</div><h4>Asset Studio</h4><p>Create structured visual briefs for characters, environments, props and scenes.</p></div><div class="card clickable" onclick="showTool('video')"><div class="icon">▶</div><h4>Video Forge</h4><p>Build the edit plan for shots, sound, captions and export format.</p></div></section>
 <div class="section-head"><h3>Your projects</h3><span id="projectCount">Saved locally in this browser</span></div><section id="projects" class="projects"></section>
 </main></div><div class="toast" id="toast"></div>
 <script>
@@ -258,15 +296,15 @@ function loadProject(id){const projects=JSON.parse(localStorage.getItem("storyfo
 function renderStory(data,idea){currentStory={title:data.title,idea:idea,data:data};document.getElementById("resultTitle").textContent=data.title;document.getElementById("logline").textContent=data.logline;document.getElementById("world").textContent=data.world;document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");document.getElementById("episodes").innerHTML=data.episodes.map(e=>"<div class='episode'><strong>"+e.number+". "+e.title+"</strong><span>"+e.summary+"</span></div>").join("");document.getElementById("shots").innerHTML=data.scenes.map(s=>"<div class='shot'><b>SHOT "+s.shot+"</b><div>"+s.camera+"</div><div>"+s.action+"</div></div>").join("");document.getElementById("results").classList.add("show")}
 function initWorkspace(){renderProjects()}
 function showTool(tool){
- const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), asset=document.getElementById("assetForm"), storyboard=document.getElementById("storyboardForm"), output=document.getElementById("toolOutput");
+ const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), asset=document.getElementById("assetForm"), storyboard=document.getElementById("storyboardForm"), video=document.getElementById("videoForm"), output=document.getElementById("toolOutput");
  if(tool==="dashboard"){panel.classList.remove("show");return}
  panel.classList.add("show"); output.style.display="none";
  world.style.display=tool==="world"?"block":"none";
  character.style.display=tool==="character"?"block":"none";
  asset.style.display=tool==="asset"?"block":"none";
- storyboard.style.display=tool==="storyboard"?"block":"none";
- document.getElementById("toolTitle").textContent=tool==="world"?"World Builder":tool==="character"?"Character Forge":tool==="asset"?"Asset Studio":"Storyboard Studio";
- document.getElementById("toolHint").textContent=tool==="world"?"Shape the rules of your universe":tool==="character"?"Create a recurring character":tool==="asset"?"Prepare consistent visual assets":"Turn a scene into production-ready shots";
+ storyboard.style.display=tool==="storyboard"?"block":"none"; video.style.display=tool==="video"?"block":"none";
+ document.getElementById("toolTitle").textContent=tool==="world"?"World Builder":tool==="character"?"Character Forge":tool==="asset"?"Asset Studio":tool==="storyboard"?"Storyboard Studio":"Video Forge";
+ document.getElementById("toolHint").textContent=tool==="world"?"Shape the rules of your universe":tool==="character"?"Create a recurring character":tool==="asset"?"Prepare consistent visual assets":tool==="storyboard"?"Turn a scene into production-ready shots":"Plan the final edit and export";
  panel.scrollIntoView({behavior:"smooth",block:"start"});
 }
 async function buildWorld(){
@@ -289,6 +327,15 @@ async function buildStoryboard(){
  toolOutput.innerHTML="<h4>Storyboard forged · "+data.episodeTitle+"</h4><p><strong>"+data.title+"</strong> · Episode "+data.episode+" · "+data.totalDuration+"</p><p style='color:#888'>"+data.continuity+"</p><div style='display:grid;gap:10px;margin-top:14px'>"+data.shots.map(s=>"<div class='shot' style='padding:16px'><b>SHOT "+String(s.number).padStart(2,"0")+" · "+s.shotType+" · "+s.duration+"</b><div><strong>Camera:</strong> "+s.camera+"</div><div><strong>Action:</strong> "+s.action+"</div><div><strong>Audio:</strong> "+s.audio+"</div><div><strong>Visual prompt:</strong> "+s.visualPrompt+"</div></div>").join("")+"</div>";
  toast("Storyboard forged: "+data.shots.length+" shots.");
 }
+async function buildVideoPlan(){
+ const payload={title:videoTitle.value,format:videoFormat.value,shots:videoShots.value,duration:videoDuration.value,captions:videoCaptions.value==="yes"};
+ const response=await fetch("/api/video-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+ const data=await response.json(); if(!response.ok){toast(data.error||"Video plan failed");return}
+ toolOutput.style.display="block";
+ toolOutput.innerHTML="<h4>Video edit plan ready</h4><p><strong>"+data.title+"</strong> · "+data.format+" · "+data.aspectRatio+" · "+data.duration+"s</p><p><strong>Audio:</strong> "+data.audio+"</p><p><strong>Captions:</strong> "+(data.captions?"Enabled":"Disabled")+"</p><h4 style='margin-top:18px'>Render plan</h4><p>"+data.renderPlan.map((x,i)=>(i+1)+". "+x).join("<br>")+"</p><p style='color:#777;font-size:12px'>Status: "+data.status+" · This is the edit-plan layer. Actual video rendering comes next.</p>";
+ toast("Video edit plan built.");
+}
+
 async function buildAsset(){
  const payload={type:assetType.value,style:assetStyle.value,subject:assetSubject.value,mood:assetMood.value,notes:assetNotes.value};
  const response=await fetch("/api/asset",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
