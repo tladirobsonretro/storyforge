@@ -288,9 +288,10 @@ app.post("/api/generate", async (req, res) => {
     return res.status(400).json({ error: "Please provide a story idea." });
   }
   const idea = req.body.idea.trim();
-  if (!process.env.POLLINATIONS_API_KEY) return res.json(buildStory(idea));
+  if (!process.env.POLLINATIONS_API_KEY) {
+    return res.json({ ...buildStory(idea), generatedBy: "template-fallback", aiConnected: false, generationWarning: "Pollinations is not connected. Add POLLINATIONS_API_KEY in Render." });
+  }
   try {
-    const system = "You are StoryForge's story engine. Create original, family-safe stories for animation. Never imitate existing franchises or living artists. Return ONLY valid JSON with keys title, logline, world, characters, episodes, scenes. characters: name, role, personality, appearance, goal. episodes: 5 objects with number, title, summary. scenes: 5 objects with shot, camera, action, audio. Make the world visually distinctive and recurring characters easy to recognize.";
     const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -300,7 +301,7 @@ app.post("/api/generate", async (req, res) => {
       body: JSON.stringify({
         model: "openai",
         messages: [
-          { role: "system", content: system },
+          { role: "system", content: "You are StoryForge's story engine. Create original, family-safe stories for animation. Never imitate existing franchises or living artists. Return ONLY valid JSON with keys title, logline, world, characters, episodes, scenes. characters: name, role, personality, appearance, goal. episodes: 5 objects with number, title, summary. scenes: 5 objects with shot, camera, action, audio. Make the world visually distinctive and recurring characters easy to recognize." },
           { role: "user", content: "Story idea: " + idea + "\nCreate a production-ready original story bible and starter storyboard." }
         ],
         temperature: 0.9
@@ -309,13 +310,15 @@ app.post("/api/generate", async (req, res) => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error?.message || data.error || "Story model failed.");
     const raw = data.choices?.[0]?.message?.content || "";
-    const parsed = JSON.parse(raw);
+    const cleaned = raw.replace(/^\`\`\`json\s*/i, "").replace(/^\`\`\`\s*/i, "").replace(/\s*\`\`\`$/i, "").trim();
+    const parsed = JSON.parse(cleaned);
     if (!parsed.title || !Array.isArray(parsed.characters) || !Array.isArray(parsed.episodes) || !Array.isArray(parsed.scenes)) {
       throw new Error("Incomplete story response.");
     }
-    res.json({ ...parsed, idea, generatedBy: "AI" });
+    res.json({ ...parsed, idea, generatedBy: "AI", aiConnected: true });
   } catch (error) {
-    res.json({ ...buildStory(idea), generatedBy: "template-fallback", generationWarning: "AI generation failed, so StoryForge returned a safe fallback story." });
+    console.error("StoryForge AI generation failed:", error.message);
+    res.json({ ...buildStory(idea), generatedBy: "template-fallback", aiConnected: true, generationWarning: "Pollinations is connected but the AI generation failed. Check the Pollinations response or Render logs." });
   }
 });
 
