@@ -1,5 +1,6 @@
 (() => {
   let currentShots = [];
+  let animatedClips = {};
 
   window.buildStoryboard = async function () {
     const payload = {
@@ -26,7 +27,7 @@
       "<div style='display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap'>" +
       "<div><h4>Visual production board · " + data.episodeTitle + "</h4>" +
       "<p><strong>" + data.title + "</strong> · Episode " + data.episode + " · " + data.totalDuration + "</p></div>" +
-      "<button class='generate' onclick='generateStoryboardFrames()'>Generate all shot frames →</button></div>" +
+      "<div style='display:flex;gap:8px;flex-wrap:wrap'><button class='generate' onclick='generateStoryboardFrames()'>Generate all shot frames →</button><button class='copy-btn' id='assembleVideoBtn' onclick='assembleFinalVideo()' disabled>Assemble final video →</button></div></div>" +
       "<p style='color:#888'>" + data.continuity + "</p>" +
       "<div id='storyboardBoard' style='display:grid;gap:12px;margin-top:14px'>" +
       currentShots.map(shotCard).join("") +
@@ -107,7 +108,9 @@
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Animation failed.");
       const holder = document.getElementById("shot-frame-" + number);
-      holder.innerHTML += "<video controls playsinline src='" + data.url + "' style='width:100%;margin-top:10px;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video>";
+      holder.innerHTML += "<video controls playsinline data-shot-clip='" + number + "' src='" + data.url + "' style='width:100%;margin-top:10px;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video>";
+      animatedClips[number] = data.url;
+      updateAssemblyButton();
       status.textContent = "ANIMATION READY";
       toast("Shot " + number + " animated.");
     } catch (error) {
@@ -115,4 +118,51 @@
       toast(error.message);
     }
   };
+
+  window.assembleFinalVideo = async function () {
+    const clips = currentShots.map(s => animatedClips[s.number]).filter(Boolean);
+    if (clips.length < 2) {
+      toast("Animate at least two shots first.");
+      return;
+    }
+    const button = document.getElementById("assembleVideoBtn");
+    button.disabled = true;
+    button.textContent = "Assembling…";
+    try {
+      const response = await fetch("/api/assemble", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clips })
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Video assembly failed.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const output = document.getElementById("toolOutput");
+      const existing = document.getElementById("finalVideoOutput");
+      if (existing) existing.remove();
+      const wrap = document.createElement("div");
+      wrap.id = "finalVideoOutput";
+      wrap.style.cssText = "margin-top:18px;padding:16px;border:1px solid #292929;border-radius:12px;background:#080808";
+      wrap.innerHTML = "<h4>FINAL VIDEO READY</h4><p style='color:#888'>Your animated storyboard has been assembled into one MP4.</p><video controls playsinline src='" + url + "' style='width:100%;max-height:620px;background:#000;border-radius:10px'></video><div style='margin-top:10px'><a class='copy-btn' href='" + url + "' download='storyforge-final.mp4' style='display:inline-block;text-decoration:none'>Download MP4 →</a></div>";
+      output.appendChild(wrap);
+      toast("Final video assembled.");
+    } catch (error) {
+      toast(error.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Assemble final video →";
+      updateAssemblyButton();
+    }
+  };
+
+  function updateAssemblyButton() {
+    const button = document.getElementById("assembleVideoBtn");
+    if (!button) return;
+    const count = Object.keys(animatedClips).length;
+    button.disabled = count < 2;
+    button.textContent = count ? "Assemble final video (" + count + ") →" : "Assemble final video →";
+  }
 })();
