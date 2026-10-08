@@ -229,6 +229,12 @@ app.post("/api/video", async (req, res) => {
   } catch (error) { res.status(502).json({ error: "Video provider could not be reached." }); }
 });
 
+app.post("/api/assemble", async (req, res) => {
+  const clips = Array.isArray(req.body?.clips) ? req.body.clips.filter(Boolean) : [];
+  if (clips.length < 2) return res.status(400).json({ error: "At least two animated shot clips are required." });
+  res.status(501).json({ error: "Shot assembly is queued for the next render-engine step. Individual animated clips are ready." });
+});
+
 app.post("/api/generate", (req, res) => {
   if (!req.body || !req.body.idea || !req.body.idea.trim()) {
     return res.status(400).json({ error: "Please provide a story idea." });
