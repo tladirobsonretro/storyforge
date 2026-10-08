@@ -107,6 +107,37 @@ app.post("/api/asset", (req, res) => {
   res.json(buildAsset(req.body));
 });
 
+app.post("/api/image", async (req, res) => {
+  if (!process.env.POLLINATIONS_API_KEY) {
+    return res.status(503).json({ error: "Image generation is not connected yet. Add POLLINATIONS_API_KEY in Render to enable it." });
+  }
+  const prompt = (req.body && req.body.prompt || "").trim();
+  const model = (req.body && req.body.model || "flux").trim();
+  if (!prompt) return res.status(400).json({ error: "An image prompt is required." });
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/images/generations", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        response_format: "url",
+        size: req.body.size || "1024x1024"
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "Image generation failed." });
+    const url = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+    if (!url) return res.status(502).json({ error: "The image provider returned no image." });
+    res.json({ url, model });
+  } catch (error) {
+    res.status(502).json({ error: "Image provider could not be reached." });
+  }
+});
+
 app.post("/api/generate", (req, res) => {
   if (!req.body || !req.body.idea || !req.body.idea.trim()) {
     return res.status(400).json({ error: "Please provide a story idea." });
@@ -167,7 +198,7 @@ app.get("/", (req, res) => {
       <div class="result-box"><h4>Mood</h4><input id="assetMood" class="tool-input" placeholder="Warm, curious, adventurous"></div>
       <div class="result-box" style="grid-column:1/-1"><h4>Continuity notes</h4><textarea id="assetNotes" class="tool-input" rows="3" placeholder="Keep the same face, outfit, proportions and signature accessory in every future scene."></textarea></div>
     </div>
-    <button class="generate tool-action" onclick="buildAsset()">Build asset brief →</button>
+    <button class="generate tool-action" onclick="buildAsset()">Build asset brief →</button><button id="generateImageButton" class="copy-btn" style="display:none" onclick="generateImage()">Generate image →</button>
   </div>
   <div id="toolOutput" class="result-box" style="display:none;margin-top:14px"></div>
 </section>
@@ -218,7 +249,20 @@ async function buildAsset(){
  const data=await response.json(); if(!response.ok){toast(data.error||"Asset failed");return}
  toolOutput.style.display="block";
  toolOutput.innerHTML="<h4>Asset brief ready</h4><p><strong>"+data.assetType+"</strong> · "+data.aspectRatio+"</p><p><strong>Visual notes:</strong> "+data.visualNotes+"</p><p><strong>Continuity:</strong> "+data.continuityNotes+"</p><h4 style='margin-top:18px'>Generation prompt</h4><div class='asset-prompt' id='assetPrompt'>"+data.prompt+"</div><button class='copy-btn' onclick='copyText("+JSON.stringify(data.prompt)+")'>Copy prompt</button><h4 style='margin-top:18px'>Negative prompt</h4><div class='asset-prompt'>"+data.negativePrompt+"</div>";
- toast("Asset brief built.");
+ document.getElementById("generateImageButton").style.display="inline-block"; toast("Asset brief built.");
+}
+async function generateImage(){
+ const prompt=document.getElementById("assetPrompt")?.textContent?.trim();
+ if(!prompt){toast("Build an asset brief first.");return}
+ const button=document.getElementById("generateImageButton");
+ button.disabled=true;button.textContent="Generating image…";
+ try{
+  const response=await fetch("/api/image",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,size:"1024x1024"})});
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.error||"Image generation failed.");
+  toolOutput.innerHTML += "<h4 style='margin-top:18px'>Generated image</h4><img src='"+data.url+"' alt='Generated StoryForge asset' style='width:100%;max-height:600px;object-fit:contain;background:#080808;border:1px solid #292929;border-radius:10px'><p style='color:#666;font-size:11px;margin-top:8px'>Generated with "+data.model+".</p>";
+  toast("Image generated.");
+ }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Generate image →"}
 }
 async function copyText(value){try{await navigator.clipboard.writeText(value);toast("Prompt copied.");}catch(e){toast("Copy unavailable. Select the prompt manually.")}}
 function toast(message){const t=document.getElementById("toast");t.textContent=message;t.style.display="block";setTimeout(()=>t.style.display="none",2600)}
