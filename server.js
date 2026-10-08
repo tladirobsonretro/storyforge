@@ -200,34 +200,23 @@ app.post("/api/shot-frame", async (req, res) => {
   } catch(e) { res.status(502).json({error:"Image provider could not be reached."}); }
 });
 
-app.post("/api/storyboard", (req, res) => {
+app.post("/api/storyboard", async (req, res) => {
   if (!req.body) return res.status(400).json({ error: "Storyboard details are required." });
-  res.json(buildStoryboard(req.body));
+  const input = req.body;
+  if (!input.scene || !process.env.POLLINATIONS_API_KEY) return res.json(buildStoryboard(input));
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
+      method: "POST", headers: {"Authorization":"Bearer "+process.env.POLLINATIONS_API_KEY,"Content-Type":"application/json"},
+      body: JSON.stringify({model:"openai",messages:[{role:"system",content:"Turn the supplied animated scene into 8 original production-ready shots. Return ONLY JSON with key shots. Each shot needs number, scene, camera, action, audio, duration, visualPrompt. Preserve the supplied characters, world and dialogue."},{role:"user",content:"WORLD: "+(input.worldBible||"")+"\nCHARACTERS: "+(input.characterBible||"")+"\nSCENE: "+JSON.stringify(input.scene)}],temperature:0.8})
+    });
+    const data=await response.json();
+    if(!response.ok) throw new Error("Storyboard model failed");
+    const raw=data.choices?.[0]?.message?.content||"";
+    const parsed=JSON.parse(raw.replace(/^```json\s*/i,"").replace(/^```\s*/i,"").replace(/\s*```$/i,"").trim());
+    if(!Array.isArray(parsed.shots)||!parsed.shots.length) throw new Error("Incomplete storyboard");
+    res.json({...parsed,status:"AI_STORYBOARD_READY"});
+  } catch(error) { res.json({...buildStoryboard(input),status:"TEMPLATE_FALLBACK"}); }
 });
-
-function buildVideoPlan(input) {
-  const title = (input.title || "Untitled Video").trim();
-  const format = (input.format || "YouTube Short").trim();
-  const shots = Math.max(1, Math.min(30, Number(input.shots || 8)));
-  const duration = Math.max(1, Math.min(60, Number(input.duration || 29)));
-  const captions = input.captions !== false;
-  return {
-    title, format, shots, duration,
-    aspectRatio: format.toLowerCase().includes("landscape") ? "16:9" : "9:16",
-    resolution: "1080p",
-    captions,
-    audio: "Dialogue / voiceover + music + scene sound effects",
-    renderPlan: [
-      "Import storyboard frames in shot order.",
-      "Apply each shot duration and camera-motion direction.",
-      "Add dialogue, music and sound effects on separate tracks.",
-      captions ? "Generate timed captions from dialogue." : "Keep captions disabled.",
-      "Render a preview before final export."
-    ],
-    status: "EDIT_PLAN_READY"
-  };
-}
-
 app.post("/api/video-plan", (req, res) => {
   if (!req.body) return res.status(400).json({ error: "Video details are required." });
   res.json(buildVideoPlan(req.body));
