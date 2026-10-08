@@ -192,7 +192,7 @@ app.post("/api/shot-frame", async (req, res) => {
   const prompt=(req.body?.prompt||"").trim();
   if(!prompt) return res.status(400).json({error:"A shot prompt is required."});
   try {
-    const response=await fetch("https://gen.pollinations.ai/v1/images/generations",{method:"POST",headers:{"Authorization":"Bearer "+process.env.POLLINATIONS_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:"flux",prompt,response_format:"url",size:req.body?.size||"1024x1024"})});
+    const response=await fetch("https://gen.pollinations.ai/v1/images/generations",{method:"POST",headers:{"Authorization":"Bearer "+process.env.POLLINATIONS_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({model:"flux",prompt,response_format:"url",size:req.body?.size||"1024x1024",...(req.body?.referenceImage ? {image:[req.body.referenceImage]} : {})})});
     const data=await response.json();
     if(!response.ok) return res.status(response.status).json({error:data.error?.message||"Frame generation failed."});
     const url=data.data?.[0]?.url||data.data?.[0]?.b64_json;
