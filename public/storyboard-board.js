@@ -72,7 +72,8 @@
           body: JSON.stringify({
             prompt: shot.visualPrompt + "; " + shot.action + "; " + shot.camera +
               "; original cinematic story frame; consistent characters, location and visual identity",
-            size: "1024x1024"
+            size: "1024x1024",
+            referenceImage: window.storyforgeCharacterReferenceImage || null
           })
         });
         const data = await response.json();
