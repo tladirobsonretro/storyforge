@@ -149,6 +149,9 @@ function buildStoryboard(input) {
   const episode = Number(input.episode || 1);
   const episodeTitle = (input.episodeTitle || "The Discovery").trim();
   const premise = (input.premise || "the heroes discover something unexpected").trim();
+  const worldBible = (input.worldBible || "").trim();
+  const characterBible = (input.characterBible || "").trim();
+  const continuityPrefix = [worldBible && "WORLD BIBLE: " + worldBible, characterBible && "CHARACTER BIBLE: " + characterBible, "Maintain exact identity, proportions, wardrobe, signature accessories, environment geography, lighting language and colour palette across every shot."].filter(Boolean).join(" ");
   const templates = [
     ["01","Extreme wide establishing","Slow aerial push-in","Establish the location and the scale of the world before the action begins.","Ambient environment, distant birds and soft score.","4s","cinematic establishing frame; original characters; consistent world design"],
     ["02","Wide shot","Gentle tracking movement","Reveal the heroes entering the location and noticing the first unusual detail.","Footsteps, environment and light dialogue.","4s","full-body character continuity; same outfits and proportions"],
@@ -161,9 +164,9 @@ function buildStoryboard(input) {
   ];
   return {
     title, episode, episodeTitle, premise,
-    shots: templates.map((t,i)=>({number:i+1,shot:t[0],shotType:t[1],camera:t[2],action:t[3],audio:t[4],duration:t[5],visualPrompt:t[6]})),
+    shots: templates.map((t,i)=>({number:i+1,shot:t[0],shotType:t[1],camera:t[2],action:t[3],audio:t[4],duration:t[5],visualPrompt:continuityPrefix + " " + t[6]})),
     totalDuration:"29s",
-    continuity:"Keep character identity, wardrobe, props, lighting, location geography and screen direction consistent across every shot."
+    continuity:"Keep character identity, wardrobe, props, lighting, location geography and screen direction consistent across every shot." + (worldBible || characterBible ? " StoryForge continuity lock is active." : " Add a world and character bible to activate the continuity lock.")
   };
 }
 
@@ -378,16 +381,16 @@ async function buildWorld(){
  const payload={name:worldName.value,premise:worldPremise.value,tone:worldTone.value,setting:worldSetting.value};
  const response=await fetch("/api/world",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"World failed");return}
- toolOutput.style.display="block"; toolOutput.innerHTML="<h4>World forged</h4><p><strong>"+data.name+"</strong><br>"+data.visualIdentity+"</p><p>"+data.rules.join("<br>")+"</p>"; toast("World forged successfully.");
+ window.storyforgeWorldBible = [data.name, data.premise, data.tone, data.setting, data.visualIdentity, "RULES: "+data.rules.join("; ")].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>World forged</h4><p><strong>"+data.name+"</strong><br>"+data.visualIdentity+"</p><p>"+data.rules.join("<br>")+"</p><p style="color:#666;font-size:11px">Continuity lock saved for Storyboard Studio.</p>"; toast("World forged successfully.");
 }
 async function buildCharacter(){
  const payload={name:charName.value,role:charRole.value,personality:charPersonality.value,appearance:charAppearance.value,goal:charGoal.value};
  const response=await fetch("/api/character",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"Character failed");return}
- toolOutput.style.display="block"; toolOutput.innerHTML="<h4>Character forged</h4><p><strong>"+data.name+"</strong> · "+data.role+"</p><p>"+data.personality+"</p><p><strong>Goal:</strong> "+data.goal+"</p><p><strong>Strength:</strong> "+data.strength+"<br><strong>Flaw:</strong> "+data.flaw+"</p><p>"+data.arc+"</p>"; toast("Character forged successfully.");
+ window.storyforgeCharacterBible = [data.name, data.role, data.personality, data.appearance, "GOAL: "+data.goal, "STRENGTH: "+data.strength, "FLAW: "+data.flaw, "ARC: "+data.arc].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>Character forged</h4><p><strong>"+data.name+"</strong> · "+data.role+"</p><p>"+data.personality+"</p><p><strong>Goal:</strong> "+data.goal+"</p><p><strong>Strength:</strong> "+data.strength+"<br><strong>Flaw:</strong> "+data.flaw+"</p><p>"+data.arc+"</p><p style="color:#666;font-size:11px">Continuity lock saved for Storyboard Studio.</p>"; toast("Character forged successfully.");
 }
 async function buildStoryboard(){
- const payload={title:boardTitle.value,episode:boardEpisode.value,episodeTitle:boardEpisodeTitle.value,premise:boardPremise.value};
+ const payload={title:boardTitle.value,episode:boardEpisode.value,episodeTitle:boardEpisodeTitle.value,premise:boardPremise.value,worldBible:window.storyforgeWorldBible||"",characterBible:window.storyforgeCharacterBible||""};
  const response=await fetch("/api/storyboard",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"Storyboard failed");return}
  toolOutput.style.display="block";
