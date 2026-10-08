@@ -84,12 +84,35 @@
     toast("Shot frame pass complete.");
   };
 
-  window.animateShot = function (number) {
+  window.animateShot = async function (number) {
     const shot = currentShots.find(s => s.number === number);
-    if (!shot) return;
-    showTool("video");
-    document.getElementById("videoTitle").value =
-      (document.getElementById("boardTitle").value || "StoryForge shot") + " · Shot " + String(number).padStart(2, "0");
-    toast("Shot " + number + " loaded into Video Forge. Animation is the next build step.");
+    const frame = document.querySelector("#shot-frame-" + number + " img");
+    if (!shot || !frame) {
+      toast("Generate the shot frame first.");
+      return;
+    }
+    const status = document.getElementById("shot-status-" + number);
+    status.textContent = "ANIMATING…";
+    try {
+      const response = await fetch("/api/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: shot.visualPrompt + "; " + shot.action + "; " + shot.camera + "; preserve the exact character and environment shown in the reference frame; smooth cinematic motion",
+          image: frame.src,
+          model: "alibaba/wan-2.2-fast",
+          duration: Math.min(10, Math.max(2, parseInt(shot.duration, 10) || 4))
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Animation failed.");
+      const holder = document.getElementById("shot-frame-" + number);
+      holder.innerHTML += "<video controls playsinline src='" + data.url + "' style='width:100%;margin-top:10px;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video>";
+      status.textContent = "ANIMATION READY";
+      toast("Shot " + number + " animated.");
+    } catch (error) {
+      status.textContent = "ANIMATION FAILED";
+      toast(error.message);
+    }
   };
 })();
