@@ -1,4 +1,9 @@
 const express = require("express");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { execFile } = require("child_process");
+const ffmpegPath = require("ffmpeg-static");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -232,7 +237,28 @@ app.post("/api/video", async (req, res) => {
 app.post("/api/assemble", async (req, res) => {
   const clips = Array.isArray(req.body?.clips) ? req.body.clips.filter(Boolean) : [];
   if (clips.length < 2) return res.status(400).json({ error: "At least two animated shot clips are required." });
-  res.status(501).json({ error: "Shot assembly is queued for the next render-engine step. Individual animated clips are ready." });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-"));
+  try {
+    const files = [];
+    for (let i = 0; i < clips.length; i++) {
+      const url = new URL(clips[i]);
+      if (!/^https?:$/.test(url.protocol)) throw new Error("Invalid clip URL.");
+      const file = path.join(dir, String(i + 1).padStart(3, "0") + ".mp4");
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Could not download shot " + (i + 1) + ".");
+      fs.writeFileSync(file, Buffer.from(await response.arrayBuffer()));
+      files.push(file);
+    }
+    const list = path.join(dir, "concat.txt");
+    fs.writeFileSync(list, files.map(f => "file '" + f.replace(/'/g, "'\\''") + "'").join("\n"));
+    const output = path.join(dir, "storyforge-final.mp4");
+    await new Promise((resolve, reject) => execFile(ffmpegPath, ["-y","-f","concat","-safe","0","-i",list,"-c","copy",output], {timeout:120000}, (error) => error ? reject(error) : resolve()));
+    res.setHeader("Content-Type", "video/mp4");
+    res.sendFile(output, () => fs.rmSync(dir, { recursive: true, force: true }));
+  } catch (error) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    res.status(502).json({ error: error.message || "Video assembly failed." });
+  }
 });
 
 app.post("/api/generate", (req, res) => {
