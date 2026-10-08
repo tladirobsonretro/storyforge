@@ -136,16 +136,22 @@ app.get("/", (req, res) => {
 </section>
 <div class="top"><div><div class="eyebrow">Creator workspace</div><h1>Bring a story to life.</h1></div><button class="new" onclick="focusPrompt()">+ New story</button></div>
 <section class="hero"><h2>What are we creating?</h2><p>Start with an idea. StoryForge turns the premise into a structured story world.</p><div class="prompt"><input id="idea" placeholder="A young explorer discovers an island that appears once every hundred years..." /><button id="generate" class="generate" onclick="createStory()">Create story →</button></div></section>
-<section id="results" class="results"><h2 id="resultTitle" class="result-title"></h2><p id="logline" class="logline"></p><div class="result-grid">
+<section id="results" class="results"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><h2 id="resultTitle" class="result-title"></h2><p id="logline" class="logline"></p></div><button class="new" onclick="saveProject()">Save project</button></div><div class="result-grid">
 <div class="result-box"><h4>World</h4><p id="world"></p></div><div class="result-box"><h4>Characters</h4><div id="characters"></div></div>
 <div class="result-box"><h4>Episode arc</h4><div id="episodes"></div></div><div class="result-box"><h4>Storyboard starter</h4><div id="shots" class="shots"></div></div>
 </div></section>
 <div class="section-head"><h3>Creative tools</h3><span>Build every layer of your story</span></div>
 <section class="cards"><div class="card"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card"><div class="icon">▤</div><h4>Storyboard</h4><p>Break scenes into shots with camera direction and action.</p></div><div class="card"><div class="icon">◇</div><h4>Asset Studio</h4><p>Generate and organise the images, voices and creative assets.</p></div><div class="card"><div class="icon">▶</div><h4>Video Forge</h4><p>Assemble scenes into short-form episodes ready for review.</p></div></section>
-<div class="section-head"><h3>Your worlds</h3><span>1 active workspace</span></div><section class="projects"><div class="project"><div><strong id="projectName">Start your first universe</strong><small id="projectSub">Your next story begins here.</small></div><span class="status">READY</span></div><div class="project"><div><strong>StoryForge pipeline</strong><small>World → Character → Story → Storyboard → Video</small></div><span class="status">BUILDING</span></div></section>
+<div class="section-head"><h3>Your projects</h3><span id="projectCount">Saved locally in this browser</span></div><section id="projects" class="projects"></section>
 </main></div><div class="toast" id="toast"></div>
 <script>
+let currentStory=null;
 function focusPrompt(){document.getElementById("idea").focus()}
+function saveProject(){if(!currentStory){toast("Create a story before saving.");return}const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");projects.unshift({id:Date.now(),title:currentStory.title,idea:currentStory.idea,data:currentStory.data});localStorage.setItem("storyforge-projects",JSON.stringify(projects.slice(0,20)));renderProjects();toast("Project saved.")}
+function renderProjects(){const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");document.getElementById("projects").innerHTML=projects.map(p=>"<div class='project' onclick='loadProject("+p.id+")' style='cursor:pointer'><div><strong>"+p.title+"</strong><small>"+p.idea+"</small></div><span class='status'>OPEN</span></div>").join("")+"<div class='project'><div><strong>StoryForge pipeline</strong><small>World → Character → Story → Storyboard → Video</small></div><span class='status'>BUILDING</span></div>"}
+function loadProject(id){const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");const p=projects.find(x=>x.id===id);if(p){renderStory(p.data,p.idea);toast("Project loaded.")}}
+function renderStory(data,idea){currentStory={title:data.title,idea:idea,data:data};document.getElementById("resultTitle").textContent=data.title;document.getElementById("logline").textContent=data.logline;document.getElementById("world").textContent=data.world;document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");document.getElementById("episodes").innerHTML=data.episodes.map(e=>"<div class='episode'><strong>"+e.number+". "+e.title+"</strong><span>"+e.summary+"</span></div>").join("");document.getElementById("shots").innerHTML=data.scenes.map(s=>"<div class='shot'><b>SHOT "+s.shot+"</b><div>"+s.camera+"</div><div>"+s.action+"</div></div>").join("");document.getElementById("results").classList.add("show")}
+function initWorkspace(){renderProjects()}
 function showTool(tool){
  const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), output=document.getElementById("toolOutput");
  if(tool==="dashboard"){panel.classList.remove("show");return}
@@ -176,7 +182,7 @@ async function createStory(){
  try{
   const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idea:value})});
   const data=await response.json(); if(!response.ok) throw new Error(data.error||"Generation failed");
-  document.getElementById("resultTitle").textContent=data.title;
+  renderStory(data,value);
   document.getElementById("logline").textContent=data.logline;
   document.getElementById("world").textContent=data.world;
   document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");
@@ -188,6 +194,7 @@ async function createStory(){
   toast("Story forged successfully.");
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
+initWorkspace();
 </script></body></html>`);
 });
 
