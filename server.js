@@ -564,7 +564,7 @@ async function createStory(){
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
 migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary();
-</script><script src="/storyboard-board.js"></script></body></html>`);
+</script><script src="/story-create.js?v=2"></script><script src="/storyboard-board.js"></script></body></html>`);
 });
 
 app.listen(PORT, () => console.log(`StoryForge running on port ${PORT}`));
