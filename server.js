@@ -362,7 +362,7 @@ app.get("/", (req, res) => {
       <div class="result-box"><h4>Appearance</h4><input id="charAppearance" class="tool-input" placeholder="Distinctive colours, expressive eyes, unique silhouette"></div>
       <div class="result-box"><h4>Goal</h4><input id="charGoal" class="tool-input" placeholder="Find the missing map"></div>
     </div>
-    <button class="generate tool-action" onclick="buildCharacter()">Forge character →</button>
+    <button class="generate tool-action" onclick="buildCharacter()">Forge character →</button><button id="characterReferenceButton" class="copy-btn" onclick="generateCharacterReference()" style="display:none">Generate reference sheet →</button>
   </div>
   <div id="storyboardForm" style="display:none">
     <div class="result-grid">
@@ -440,6 +440,23 @@ async function buildWorld(){
  const response=await fetch("/api/world",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"World failed");return}
  window.storyforgeWorldBible = [data.name, data.premise, data.tone, data.setting, data.visualIdentity, "RULES: "+data.rules.join("; ")].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>World forged</h4><p><strong>"+data.name+"</strong><br>"+data.visualIdentity+"</p><p>"+data.rules.join("<br>")+"</p><p style='color:#666;font-size:11px'>Continuity lock saved for Storyboard Studio.</p>"; toast("World forged successfully.");
+}
+async function generateCharacterReference(){
+ const bible=window.storyforgeCharacterBible||"";
+ if(!bible){toast("Forge the character first.");return}
+ const button=document.getElementById("characterReferenceButton");
+ button.disabled=true;button.textContent="Generating reference sheet…";
+ try{
+  const prompt="Original recurring animation character reference sheet. "+bible+". Show the exact same character in full-body front view, 3/4 view and side view on a clean neutral background. Clear silhouette, readable face, consistent proportions, wardrobe and signature accessories. No text, no logos, no existing franchise style. This is a continuity reference for future StoryForge scenes.";
+  const response=await fetch("/api/image",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,size:"1024x1024"})});
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.error||"Reference generation failed.");
+  window.storyforgeCharacterReferenceImage=data.url;
+  toolOutput.style.display="block";
+  toolOutput.innerHTML += "<h4 style='margin-top:18px'>Character continuity reference</h4><img src='"+data.url+"' alt='Character reference sheet' style='width:100%;max-height:600px;object-fit:contain;background:#080808;border:1px solid #292929;border-radius:10px'><p style='color:#666;font-size:11px'>This reference will be supplied to animation shots as a continuity guide.</p>";
+  try{localStorage.setItem("storyforge-character-reference",data.url)}catch(e){}
+  toast("Character reference locked.");
+ }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Regenerate reference sheet →"}
 }
 async function buildCharacter(){
  const payload={name:charName.value,role:charRole.value,personality:charPersonality.value,appearance:charAppearance.value,goal:charGoal.value};
