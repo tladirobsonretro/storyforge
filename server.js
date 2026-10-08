@@ -219,7 +219,7 @@ app.post("/api/video", async (req, res) => {
     const response = await fetch("https://gen.pollinations.ai/v1/videos/generations", {
       method: "POST",
       headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, duration })
+      body: JSON.stringify({ model, prompt, duration, ...(req.body?.image ? { image: [req.body.image] } : {}) })
     });
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "Video generation failed." });
