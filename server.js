@@ -194,6 +194,26 @@ app.post("/api/video-plan", (req, res) => {
   res.json(buildVideoPlan(req.body));
 });
 
+app.post("/api/video", async (req, res) => {
+  if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({ error: "Video generation is not connected yet. Add POLLINATIONS_API_KEY in Render to enable it." });
+  const prompt = (req.body && req.body.prompt || "").trim();
+  const model = (req.body && req.body.model || "alibaba/wan-2.2-fast").trim();
+  const duration = Math.max(2, Math.min(10, Number(req.body.duration || 4)));
+  if (!prompt) return res.status(400).json({ error: "A video prompt is required." });
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/videos/generations", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, prompt, duration })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "Video generation failed." });
+    const url = data.data?.[0]?.url || data.data?.[0]?.b64_json;
+    if (!url) return res.status(502).json({ error: "The video provider returned no video." });
+    res.json({ url, model, duration });
+  } catch (error) { res.status(502).json({ error: "Video provider could not be reached." }); }
+});
+
 app.post("/api/generate", (req, res) => {
   if (!req.body || !req.body.idea || !req.body.idea.trim()) {
     return res.status(400).json({ error: "Please provide a story idea." });
@@ -263,7 +283,7 @@ app.get("/", (req, res) => {
       <div class="result-box"><h4>Total duration (seconds)</h4><input id="videoDuration" class="tool-input" type="number" min="1" max="60" value="29"></div>
       <div class="result-box"><h4>Captions</h4><select id="videoCaptions" class="tool-input"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
-    <button class="generate tool-action" onclick="buildVideoPlan()">Build edit plan →</button>
+    <button class="generate tool-action" onclick="buildVideoPlan()">Build edit plan →</button><button id="videoGenerateButton" class="copy-btn" onclick="generateVideo()">Generate test clip →</button>
   </div>
   <div id="assetForm" style="display:none">
     <div class="result-grid">
@@ -334,6 +354,17 @@ async function buildVideoPlan(){
  toolOutput.style.display="block";
  toolOutput.innerHTML="<h4>Video edit plan ready</h4><p><strong>"+data.title+"</strong> · "+data.format+" · "+data.aspectRatio+" · "+data.duration+"s</p><p><strong>Audio:</strong> "+data.audio+"</p><p><strong>Captions:</strong> "+(data.captions?"Enabled":"Disabled")+"</p><h4 style='margin-top:18px'>Render plan</h4><p>"+data.renderPlan.map((x,i)=>(i+1)+". "+x).join("<br>")+"</p><p style='color:#777;font-size:12px'>Status: "+data.status+" · This is the edit-plan layer. Actual video rendering comes next.</p>";
  toast("Video edit plan built.");
+}
+
+async function generateVideo(){
+ const prompt=(document.getElementById("videoTitle").value||"cinematic animated adventure").trim()+"; original characters, cinematic motion, coherent environment, polished animation";
+ const button=document.getElementById("videoGenerateButton"); button.disabled=true; button.textContent="Generating clip…";
+ try{
+  const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:"alibaba/wan-2.2-fast",duration:4})});
+  const data=await response.json(); if(!response.ok) throw new Error(data.error||"Video generation failed.");
+  toolOutput.style.display="block"; toolOutput.innerHTML+="<h4 style='margin-top:18px'>Generated test clip</h4><video controls playsinline src='"+data.url+"' style='width:100%;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#666;font-size:11px'>Generated with "+data.model+" · "+data.duration+"s.</p>";
+  toast("Video clip generated.");
+ }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Generate test clip →"}
 }
 
 async function buildAsset(){
