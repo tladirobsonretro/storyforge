@@ -7,7 +7,10 @@
       title: document.getElementById("boardTitle").value,
       episode: document.getElementById("boardEpisode").value,
       episodeTitle: document.getElementById("boardEpisodeTitle").value,
-      premise: document.getElementById("boardPremise").value
+      premise: document.getElementById("boardPremise").value,
+      scene: window.storyforgeScene || null,
+      worldBible: window.storyforgeWorldBible || "",
+      characterBible: window.storyforgeCharacterBible || ""
     };
     const response = await fetch("/api/storyboard", {
       method: "POST",
@@ -28,7 +31,7 @@
       "<div><h4>Visual production board · " + data.episodeTitle + "</h4>" +
       "<p><strong>" + data.title + "</strong> · Episode " + data.episode + " · " + data.totalDuration + "</p></div>" +
       "<div style='display:flex;gap:8px;flex-wrap:wrap'><button class='generate' onclick='generateStoryboardFrames()'>Generate all shot frames →</button><button class='copy-btn' id='assembleVideoBtn' onclick='assembleFinalVideo()' disabled>Assemble final video →</button></div></div>" +
-      "<p style='color:#888'>" + data.continuity + "</p>" +
+      "<p style='color:#888'>" + data.continuity + "</p>" + "<p style='color:#888'>Scene context automatically connected from Story Engine when available.</p>" +
       "<div id='storyboardBoard' style='display:grid;gap:12px;margin-top:14px'>" +
       currentShots.map(shotCard).join("") +
       "</div>";
