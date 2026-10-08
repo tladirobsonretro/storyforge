@@ -138,6 +138,34 @@ app.post("/api/image", async (req, res) => {
   }
 });
 
+function buildStoryboard(input) {
+  const title = (input.title || "Untitled Story").trim();
+  const episode = Number(input.episode || 1);
+  const episodeTitle = (input.episodeTitle || "The Discovery").trim();
+  const premise = (input.premise || "the heroes discover something unexpected").trim();
+  const templates = [
+    ["01","Extreme wide establishing","Slow aerial push-in","Establish the location and the scale of the world before the action begins.","Ambient environment, distant birds and soft score.","4s","cinematic establishing frame; original characters; consistent world design"],
+    ["02","Wide shot","Gentle tracking movement","Reveal the heroes entering the location and noticing the first unusual detail.","Footsteps, environment and light dialogue.","4s","full-body character continuity; same outfits and proportions"],
+    ["03","Medium two-shot","Slow lateral track","Let the heroes react to the discovery and establish their relationship.","Dialogue, subtle character movement and score.","4s","consistent facial features and wardrobe"],
+    ["04","Over-the-shoulder","Slow push toward subject","Show what the heroes are looking at and make the audience discover it with them.","Music builds; environmental detail.","3s","match previous location, lighting and character eyelines"],
+    ["05","Close-up","Locked camera with tiny push-in","Focus on the clue, expression or object that changes the direction of the story.","Score drops to a discovery cue.","3s","prop and facial detail must remain consistent"],
+    ["06","Reaction close-up","Tiny handheld drift","Capture the emotional reaction and the decision to continue.","Breath, dialogue or a short musical beat.","3s","preserve character identity and emotional continuity"],
+    ["07","Action wide","Dynamic follow shot","Turn the discovery into movement as the heroes commit to the next step.","Footsteps, movement and rising score.","4s","maintain screen direction and environment continuity"],
+    ["08","Final cinematic frame","Slow pull-back","End the scene on a memorable image that naturally leads into the next scene.","Music resolves into a transition cue.","4s","strong silhouette; clean composition; continuity-ready"]
+  ];
+  return {
+    title, episode, episodeTitle, premise,
+    shots: templates.map((t,i)=>({number:i+1,shot:t[0],shotType:t[1],camera:t[2],action:t[3],audio:t[4],duration:t[5],visualPrompt:t[6]})),
+    totalDuration:"29s",
+    continuity:"Keep character identity, wardrobe, props, lighting, location geography and screen direction consistent across every shot."
+  };
+}
+
+app.post("/api/storyboard", (req, res) => {
+  if (!req.body) return res.status(400).json({ error: "Storyboard details are required." });
+  res.json(buildStoryboard(req.body));
+});
+
 app.post("/api/generate", (req, res) => {
   if (!req.body || !req.body.idea || !req.body.idea.trim()) {
     return res.status(400).json({ error: "Please provide a story idea." });
@@ -166,7 +194,7 @@ app.get("/", (req, res) => {
 </head>
 <body><div class="app">
 <aside class="sidebar"><div class="logo">StoryForge <span>AI</span></div><nav class="nav">
-<button class="active" onclick="showTool('dashboard')">⌂ &nbsp; Dashboard</button><button onclick="showTool('world')">◈ &nbsp; Worlds</button><button onclick="showTool('character')">● &nbsp; Characters</button><button onclick="showTool('asset')">◇ &nbsp; Assets</button><button>▣ &nbsp; Stories</button><button>▶ &nbsp; Videos</button>
+<button class="active" onclick="showTool('dashboard')">⌂ &nbsp; Dashboard</button><button onclick="showTool('world')">◈ &nbsp; Worlds</button><button onclick="showTool('character')">● &nbsp; Characters</button><button onclick="showTool('asset')">◇ &nbsp; Assets</button><button onclick="showTool('storyboard')">▤ &nbsp; Storyboard</button><button>▣ &nbsp; Stories</button><button>▶ &nbsp; Videos</button>
 </nav><div class="side-bottom">Create once. Build a universe.</div></aside>
 <main class="main">
 <section id="toolPanel" class="results" style="margin-top:0;margin-bottom:28px">
@@ -190,6 +218,15 @@ app.get("/", (req, res) => {
     </div>
     <button class="generate tool-action" onclick="buildCharacter()">Forge character →</button>
   </div>
+  <div id="storyboardForm" style="display:none">
+    <div class="result-grid">
+      <div class="result-box"><h4>Story title</h4><input id="boardTitle" class="tool-input" placeholder="The Island That Appears Once a Century"></div>
+      <div class="result-box"><h4>Episode</h4><input id="boardEpisode" class="tool-input" type="number" min="1" value="1"></div>
+      <div class="result-box"><h4>Episode title</h4><input id="boardEpisodeTitle" class="tool-input" placeholder="The Discovery"></div>
+      <div class="result-box"><h4>Scene premise</h4><textarea id="boardPremise" class="tool-input" rows="3" placeholder="The heroes discover a glowing compass hidden beneath an ancient tree."></textarea></div>
+    </div>
+    <button class="generate tool-action" onclick="buildStoryboard()">Forge storyboard →</button>
+  </div>
   <div id="assetForm" style="display:none">
     <div class="result-grid">
       <div class="result-box"><h4>Asset type</h4><select id="assetType" class="tool-input"><option>character</option><option>environment</option><option>prop</option><option>scene</option></select></div>
@@ -209,7 +246,7 @@ app.get("/", (req, res) => {
 <div class="result-box"><h4>Episode arc</h4><div id="episodes"></div></div><div class="result-box"><h4>Storyboard starter</h4><div id="shots" class="shots"></div></div>
 </div></section>
 <div class="section-head"><h3>Creative tools</h3><span>Build every layer of your story</span></div>
-<section class="cards"><div class="card clickable" onclick="showTool('world')"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card clickable" onclick="showTool('character')"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card"><div class="icon">▤</div><h4>Storyboard</h4><p>Break scenes into shots with camera direction and action.</p></div><div class="card clickable" onclick="showTool('asset')"><div class="icon">◇</div><h4>Asset Studio</h4><p>Create structured visual briefs for characters, environments, props and scenes.</p></div><div class="card"><div class="icon">▶</div><h4>Video Forge</h4><p>Assemble scenes into short-form episodes ready for review.</p></div></section>
+<section class="cards"><div class="card clickable" onclick="showTool('world')"><div class="icon">◉</div><h4>World Builder</h4><p>Define locations, rules, history, tone and visual identity.</p></div><div class="card clickable" onclick="showTool('character')"><div class="icon">♙</div><h4>Character Forge</h4><p>Create recurring characters with personalities and visual consistency.</p></div><div class="card"><div class="icon">✦</div><h4>Story Engine</h4><p>Turn a premise into episodes, scenes, dialogue and narrative arcs.</p></div><div class="card clickable" onclick="showTool('storyboard')"><div class="icon">▤</div><h4>Storyboard Studio</h4><p>Break scenes into production-ready shots with camera, action, audio and continuity.</p></div><div class="card clickable" onclick="showTool('asset')"><div class="icon">◇</div><h4>Asset Studio</h4><p>Create structured visual briefs for characters, environments, props and scenes.</p></div><div class="card"><div class="icon">▶</div><h4>Video Forge</h4><p>Assemble scenes into short-form episodes ready for review.</p></div></section>
 <div class="section-head"><h3>Your projects</h3><span id="projectCount">Saved locally in this browser</span></div><section id="projects" class="projects"></section>
 </main></div><div class="toast" id="toast"></div>
 <script>
@@ -221,14 +258,15 @@ function loadProject(id){const projects=JSON.parse(localStorage.getItem("storyfo
 function renderStory(data,idea){currentStory={title:data.title,idea:idea,data:data};document.getElementById("resultTitle").textContent=data.title;document.getElementById("logline").textContent=data.logline;document.getElementById("world").textContent=data.world;document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");document.getElementById("episodes").innerHTML=data.episodes.map(e=>"<div class='episode'><strong>"+e.number+". "+e.title+"</strong><span>"+e.summary+"</span></div>").join("");document.getElementById("shots").innerHTML=data.scenes.map(s=>"<div class='shot'><b>SHOT "+s.shot+"</b><div>"+s.camera+"</div><div>"+s.action+"</div></div>").join("");document.getElementById("results").classList.add("show")}
 function initWorkspace(){renderProjects()}
 function showTool(tool){
- const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), asset=document.getElementById("assetForm"), output=document.getElementById("toolOutput");
+ const panel=document.getElementById("toolPanel"), world=document.getElementById("worldForm"), character=document.getElementById("characterForm"), asset=document.getElementById("assetForm"), storyboard=document.getElementById("storyboardForm"), output=document.getElementById("toolOutput");
  if(tool==="dashboard"){panel.classList.remove("show");return}
  panel.classList.add("show"); output.style.display="none";
  world.style.display=tool==="world"?"block":"none";
  character.style.display=tool==="character"?"block":"none";
  asset.style.display=tool==="asset"?"block":"none";
- document.getElementById("toolTitle").textContent=tool==="world"?"World Builder":tool==="character"?"Character Forge":"Asset Studio";
- document.getElementById("toolHint").textContent=tool==="world"?"Shape the rules of your universe":tool==="character"?"Create a recurring character":"Prepare consistent visual assets";
+ storyboard.style.display=tool==="storyboard"?"block":"none";
+ document.getElementById("toolTitle").textContent=tool==="world"?"World Builder":tool==="character"?"Character Forge":tool==="asset"?"Asset Studio":"Storyboard Studio";
+ document.getElementById("toolHint").textContent=tool==="world"?"Shape the rules of your universe":tool==="character"?"Create a recurring character":tool==="asset"?"Prepare consistent visual assets":"Turn a scene into production-ready shots";
  panel.scrollIntoView({behavior:"smooth",block:"start"});
 }
 async function buildWorld(){
@@ -242,6 +280,14 @@ async function buildCharacter(){
  const response=await fetch("/api/character",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"Character failed");return}
  toolOutput.style.display="block"; toolOutput.innerHTML="<h4>Character forged</h4><p><strong>"+data.name+"</strong> · "+data.role+"</p><p>"+data.personality+"</p><p><strong>Goal:</strong> "+data.goal+"</p><p><strong>Strength:</strong> "+data.strength+"<br><strong>Flaw:</strong> "+data.flaw+"</p><p>"+data.arc+"</p>"; toast("Character forged successfully.");
+}
+async function buildStoryboard(){
+ const payload={title:boardTitle.value,episode:boardEpisode.value,episodeTitle:boardEpisodeTitle.value,premise:boardPremise.value};
+ const response=await fetch("/api/storyboard",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+ const data=await response.json(); if(!response.ok){toast(data.error||"Storyboard failed");return}
+ toolOutput.style.display="block";
+ toolOutput.innerHTML="<h4>Storyboard forged · "+data.episodeTitle+"</h4><p><strong>"+data.title+"</strong> · Episode "+data.episode+" · "+data.totalDuration+"</p><p style='color:#888'>"+data.continuity+"</p><div style='display:grid;gap:10px;margin-top:14px'>"+data.shots.map(s=>"<div class='shot' style='padding:16px'><b>SHOT "+String(s.number).padStart(2,"0")+" · "+s.shotType+" · "+s.duration+"</b><div><strong>Camera:</strong> "+s.camera+"</div><div><strong>Action:</strong> "+s.action+"</div><div><strong>Audio:</strong> "+s.audio+"</div><div><strong>Visual prompt:</strong> "+s.visualPrompt+"</div></div>").join("")+"</div>";
+ toast("Storyboard forged: "+data.shots.length+" shots.");
 }
 async function buildAsset(){
  const payload={type:assetType.value,style:assetStyle.value,subject:assetSubject.value,mood:assetMood.value,notes:assetNotes.value};
