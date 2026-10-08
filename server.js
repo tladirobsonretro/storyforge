@@ -381,13 +381,13 @@ async function buildWorld(){
  const payload={name:worldName.value,premise:worldPremise.value,tone:worldTone.value,setting:worldSetting.value};
  const response=await fetch("/api/world",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"World failed");return}
- window.storyforgeWorldBible = [data.name, data.premise, data.tone, data.setting, data.visualIdentity, "RULES: "+data.rules.join("; ")].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>World forged</h4><p><strong>"+data.name+"</strong><br>"+data.visualIdentity+"</p><p>"+data.rules.join("<br>")+"</p><p style="color:#666;font-size:11px">Continuity lock saved for Storyboard Studio.</p>"; toast("World forged successfully.");
+ window.storyforgeWorldBible = [data.name, data.premise, data.tone, data.setting, data.visualIdentity, "RULES: "+data.rules.join("; ")].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>World forged</h4><p><strong>"+data.name+"</strong><br>"+data.visualIdentity+"</p><p>"+data.rules.join("<br>")+"</p><p style='color:#666;font-size:11px'>Continuity lock saved for Storyboard Studio.</p>"; toast("World forged successfully.");
 }
 async function buildCharacter(){
  const payload={name:charName.value,role:charRole.value,personality:charPersonality.value,appearance:charAppearance.value,goal:charGoal.value};
  const response=await fetch("/api/character",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
  const data=await response.json(); if(!response.ok){toast(data.error||"Character failed");return}
- window.storyforgeCharacterBible = [data.name, data.role, data.personality, data.appearance, "GOAL: "+data.goal, "STRENGTH: "+data.strength, "FLAW: "+data.flaw, "ARC: "+data.arc].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>Character forged</h4><p><strong>"+data.name+"</strong> · "+data.role+"</p><p>"+data.personality+"</p><p><strong>Goal:</strong> "+data.goal+"</p><p><strong>Strength:</strong> "+data.strength+"<br><strong>Flaw:</strong> "+data.flaw+"</p><p>"+data.arc+"</p><p style="color:#666;font-size:11px">Continuity lock saved for Storyboard Studio.</p>"; toast("Character forged successfully.");
+ window.storyforgeCharacterBible = [data.name, data.role, data.personality, data.appearance, "GOAL: "+data.goal, "STRENGTH: "+data.strength, "FLAW: "+data.flaw, "ARC: "+data.arc].join(" | "); toolOutput.style.display="block"; toolOutput.innerHTML="<h4>Character forged</h4><p><strong>"+data.name+"</strong> · "+data.role+"</p><p>"+data.personality+"</p><p><strong>Goal:</strong> "+data.goal+"</p><p><strong>Strength:</strong> "+data.strength+"<br><strong>Flaw:</strong> "+data.flaw+"</p><p>"+data.arc+"</p><p style='color:#666;font-size:11px'>Continuity lock saved for Storyboard Studio.</p>"; toast("Character forged successfully.");
 }
 async function buildStoryboard(){
  const payload={title:boardTitle.value,episode:boardEpisode.value,episodeTitle:boardEpisodeTitle.value,premise:boardPremise.value,worldBible:window.storyforgeWorldBible||"",characterBible:window.storyforgeCharacterBible||""};
@@ -448,6 +448,8 @@ async function createStory(){
   const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idea:value})});
   const data=await response.json(); if(!response.ok) throw new Error(data.error||"Generation failed");
   renderStory(data,value);
+  window.storyforgeWorldBible = data.world || "";
+  window.storyforgeCharacterBible = (data.characters || []).map(c => [c.name, c.role].join(" | ")).join(" ; ");
   toast("Story forged successfully.");
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
