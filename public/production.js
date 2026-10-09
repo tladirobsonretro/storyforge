@@ -1,111 +1,227 @@
 (() => {
   const $ = id => document.getElementById(id);
   const esc = s => String(s || "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  let clips = [], scenes = [], finalUrl = null, busy = false;
-  function view(id) { document.querySelectorAll("main > section").forEach(s => s.classList.toggle("hidden", s.id !== id)); window.scrollTo({top:0,behavior:"instant"}); }
+  let scenes = [], busy = false, breakdownReady = false, finalUrl = null;
+  const RUNTIME = 30;
+  const CLIP_DURATIONS = [8, 8, 7, 7];
+
+  function view(id) {
+    document.querySelectorAll("main > section").forEach(s => s.classList.toggle("hidden", s.id !== id));
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
   function addUi() {
     const main = document.querySelector("main");
     if (!main || $("productionView")) return;
     const css = document.createElement("style");
-    css.textContent = ".prodgrid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:20px}.prodcard{border:1px solid #303030;background:#101010;border-radius:13px;padding:17px}.prodsteps{display:grid;gap:9px}.prodstep{border:1px solid #292929;background:#0b0b0b;border-radius:9px;padding:12px;font-size:13px}.prodstep small{display:block;color:#888;line-height:1.5;margin-top:4px}.prodlist{display:grid;gap:12px;margin-top:16px}.prodscene{border:1px solid #303030;border-radius:11px;padding:14px}.prodscene textarea{min-height:85px}.prodscene video{width:100%;max-height:250px;background:#000;margin-top:10px;border-radius:8px}.prodrow{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}@media(max-width:700px){.prodgrid{grid-template-columns:1fr}}";
+    css.textContent = `
+      .sf-production{max-width:900px;margin:0 auto}
+      .sf-panel{border:1px solid #303030;background:#101010;border-radius:14px;padding:20px;margin-top:18px}
+      .sf-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+      .sf-scenes{display:grid;gap:12px;margin-top:18px}
+      .sf-scene{border:1px solid #303030;border-radius:12px;padding:16px;background:#0b0b0b}
+      .sf-scene p{line-height:1.6;white-space:pre-wrap}
+      .sf-scene textarea{width:100%;min-height:100px}
+      .sf-spinner{display:inline-block;width:16px;height:16px;border:2px solid #777;border-top-color:#fff;border-radius:50%;animation:sfspin .8s linear infinite;vertical-align:-3px;margin-right:8px}
+      .sf-progress{height:5px;background:#292929;border-radius:10px;overflow:hidden;margin-top:16px}
+      .sf-progress span{display:block;height:100%;width:35%;background:#eee;border-radius:10px;animation:sftravel 1.4s ease-in-out infinite}
+      .sf-video{width:100%;max-height:65vh;background:#000;border-radius:10px;margin-top:14px}
+      @keyframes sfspin{to{transform:rotate(360deg)}}
+      @keyframes sftravel{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+      @media(max-width:640px){.sf-panel{padding:15px}}
+    `;
     document.head.appendChild(css);
     main.insertAdjacentHTML("beforeend", `
-      <section id="productionView" class="hidden">
-        <div class="workshop-head"><div><div class="eyebrow">Story Workshop · Step 5</div><h1>Produce your episode</h1><p class="subheading" style="text-align:left">Your story and episode blueprints are already here. Choose the output and let StoryForge handle the production steps.</p><div class="status" id="prodStatus" role="status">Ready when you are.</div></div><button class="btn" id="prodBack" type="button">← Step 4</button></div>
-        <div class="prodgrid"><div class="prodcard"><div class="section-title">Your release</div><p class="section-copy">Choose the episode, length and publishing rhythm. One click runs the production pipeline.</p>
-          <div class="field-grid"><div class="field"><label class="label" for="prodEpisode">Episode</label><select id="prodEpisode"></select></div><div class="field"><label class="label" for="prodRuntime">Length</label><select id="prodRuntime"><option value="30">30-second Short</option><option value="60">60-second Short</option><option value="90">90-second video</option></select></div><div class="field"><label class="label" for="prodPlatform">Main platform</label><select id="prodPlatform"><option>YouTube Shorts</option><option>YouTube</option><option>Instagram Reels</option><option>TikTok</option><option>Facebook Reels</option></select></div><div class="field"><label class="label" for="prodCadence">Posting rhythm</label><select id="prodCadence"><option>Every week</option><option>Twice a week</option><option>Every 3 days</option><option>Daily</option></select></div></div>
-          <div class="prodrow"><button class="btn primary" id="prodStart" type="button">Produce episode ↗</button><button class="btn" id="prodEdit" type="button">Edit & Export</button></div><p class="help">Scene breakdown, storyboard, continuity prompts and video clips are prepared automatically. Actual video generation requires the connected provider.</p>
-        </div><div class="prodcard"><div class="section-title">Automatic production</div><div class="prodsteps"><div class="prodstep" id="prodStage1"><b>1. Scene breakdown</b><small>Uses your existing episode plan.</small></div><div class="prodstep" id="prodStage2"><b>2. Storyboard & assets</b><small>Creates shot guidance and character/location prompts.</small></div><div class="prodstep" id="prodStage3"><b>3. Video generation</b><small>Renders clips and reports any failed scene.</small></div><div class="prodstep" id="prodStage4"><b>4. Ready to edit</b><small>Review or export the episode.</small></div></div><div style="height:4px;background:#292929;border-radius:8px;margin-top:15px"><div id="prodBar" style="height:4px;width:0;background:#eee;border-radius:8px"></div></div><p class="help" id="prodProgress">Nothing generated yet.</p></div></div>
-        <div class="prodcard" style="margin-top:14px"><div class="section-title">Upcoming releases</div><p class="section-copy">StoryForge plans your eight episodes around your chosen rhythm. This is a schedule, not automatic publishing.</p><div id="releaseCalendar" class="prodlist"><div class="empty">Your release plan will appear here.</div></div></div>
-      </section>
-      <section id="exportView" class="hidden"><div class="workshop-head"><div><div class="eyebrow">Story Workshop · Step 8</div><h1>Edit & Export</h1><p class="subheading" style="text-align:left">Change a scene prompt, regenerate only that scene, then assemble the episode into an MP4.</p><div class="status" id="exportStatus" role="status">No episode loaded yet.</div></div><button class="btn" id="exportBack" type="button">← Production</button></div><div class="prodcard"><h2 class="section-title" id="exportTitle">Episode preview</h2><div id="prodScenes" class="prodlist"><div class="empty">Produce an episode first.</div></div><div class="prodrow"><button class="btn primary" id="prodAssemble" type="button">Assemble & export MP4</button><button class="btn" id="prodSave" type="button">Save production notes</button></div><div id="prodFinalWrap" class="hidden" style="margin-top:18px"><video id="prodFinal" controls playsinline style="width:100%;max-height:480px;background:#000"></video><div class="prodrow"><a id="prodDownload" class="btn primary" download="storyforge-episode.mp4">Download MP4</a></div></div></div></section>`);
+      <section id="productionView" class="hidden sf-production">
+        <div class="workshop-head">
+          <div><div class="eyebrow">Story Workshop · Step 5</div><h1>Episode 01 · Scene breakdown</h1>
+          <p class="subheading" style="text-align:left">Turn Episode 1's approved blueprint into a scene-by-scene plan. Review it before generating video.</p>
+          <div class="status" id="sfStatus" role="status" aria-live="polite">Ready to create the scene breakdown.</div></div>
+          <button class="btn" id="sfBack" type="button">← Step 4</button>
+        </div>
+        <div class="sf-panel" id="sfStartPanel">
+          <div class="section-title">Episode 01</div>
+          <p id="sfEpisodeTitle" class="section-copy">Using the episode blueprint you already created in Step 4.</p>
+          <button class="btn primary" id="sfCreate" type="button">Create scene breakdown</button>
+          <div id="sfWorking" class="hidden" aria-live="polite"><p id="sfWorkingText"><span class="sf-spinner"></span>Reading Episode 1…</p><div class="sf-progress"><span></span></div></div>
+        </div>
+        <div class="sf-panel hidden" id="sfDonePanel">
+          <div class="section-title">Scene breakdown complete</div>
+          <p class="section-copy" id="sfDoneText">Done. Your scene breakdown is ready to review.</p>
+          <button class="btn primary" id="sfOpen" type="button">Done · Open scene breakdown ↗</button>
+        </div>
+        <div class="sf-panel hidden" id="sfBreakdownPanel">
+          <div class="section-title" id="sfBreakdownTitle">Episode 01 · Scene breakdown</div>
+          <p class="section-copy">Check the order, action and visual prompts. Producing the video will use this breakdown and the visual style selected in your series settings.</p>
+          <div id="sfSceneList" class="sf-scenes"></div>
+          <div class="sf-actions">
+            <button class="btn" id="sfRetry" type="button">Retry breakdown</button>
+            <button class="btn primary" id="sfProduce" type="button">Produce video · 30 seconds ↗</button>
+          </div>
+          <div id="sfVideoWorking" class="hidden" aria-live="polite"><p id="sfVideoWorkingText"><span class="sf-spinner"></span>Preparing video…</p><div class="sf-progress"><span></span></div></div>
+          <div id="sfVideoResult" class="hidden">
+            <div class="section-title" style="margin-top:22px">Episode video ready</div>
+            <video id="sfFinalVideo" class="sf-video" controls playsinline></video>
+            <div class="sf-actions"><a id="sfDownload" class="btn primary" download="storyforge-episode-01.mp4">Download video</a></div>
+          </div>
+        </div>
+      </section>`);
   }
-
-  function renderCalendar() {
-    const root=$("releaseCalendar");if(!root)return;
-    const map=(()=>{try{return JSON.parse($("episodeBlueprints").value||"{}")}catch(e){return {}}})();
-    const count=Math.max(1,Math.min(12,Number($("episodeCount")?.value)||8));
-    const cadence=$("prodCadence")?.value||"Every week",platform=$("prodPlatform")?.value||"YouTube Shorts";
-    const days=cadence==="Daily"?1:cadence==="Twice a week"?3.5:cadence==="Every 3 days"?3:7;
-    const start=new Date();start.setHours(12,0,0,0);
-    root.innerHTML=Array.from({length:count},(_,i)=>{
-      const ep=map[String(i+1)]||{},date=new Date(start.getTime()+Math.round(i*days*86400000));
-      const dateLabel=date.toLocaleDateString(undefined,{weekday:"short",day:"numeric",month:"short"});
-      return '<div class="prodscene"><div class="scene-card-head"><strong>Episode '+(i+1)+': '+esc(ep.episodeTitle||"Title to be confirmed")+'</strong><span class="saved-meta">'+dateLabel+'</span></div><p class="help">'+esc(platform)+' · '+esc(cadence)+' · Planned</p></div>';
-    }).join("");
-  }
-
-  function setView(id) { view(id); }
   function dataForEpisode() {
-    const map = (()=>{try{return JSON.parse($("episodeBlueprints").value||"{}")}catch(e){return {}}})();
-    const n = String($("prodEpisode").value || "1");
-    const selected = map[n] && typeof map[n] === "object" ? map[n] : {};
-    // Deliberately read only this episode's blueprint fields. Never use the season arc,
-    // season episode list, or other episode blueprints as scene premises.
+    let map = {};
+    try { map = JSON.parse($("episodeBlueprints")?.value || "{}"); } catch (_) {}
+    const selected = map["1"] && typeof map["1"] === "object" ? map["1"] : {};
     return {
-      number:n,
-      title:String(selected.episodeTitle||("Episode "+n)).trim(),
-      purpose:String(selected.episodePurpose||"").trim(),
-      opening:String(selected.episodeOpening||"").trim(),
-      turn:String(selected.episodeTurn||"").trim(),
-      beats:String(selected.episodeBeats||"").trim(),
-      ending:String(selected.episodeEnding||"").trim(),
-      character:String(selected.episodeCharacterBeat||"").trim(),
-      visuals:String(selected.episodeVisuals||"").trim(),
-      continuity:String(selected.episodeContinuity||"").trim()
+      number: 1,
+      title: String(selected.episodeTitle || "Episode 01").trim(),
+      purpose: String(selected.episodePurpose || "").trim(),
+      opening: String(selected.episodeOpening || "").trim(),
+      turn: String(selected.episodeTurn || "").trim(),
+      beats: String(selected.episodeBeats || "").trim(),
+      ending: String(selected.episodeEnding || "").trim(),
+      character: String(selected.episodeCharacterBeat || "").trim(),
+      visuals: String(selected.episodeVisuals || "").trim(),
+      continuity: String(selected.episodeContinuity || "").trim()
     };
   }
-  const world = () => [$("bibleWorld")?.value,$("setting")?.value,$("worldRules")?.value,$("bibleRules")?.value,$("bibleLocations")?.value].filter(Boolean).join("\n");
-  const chars = () => [$("protagonist")?.value,$("antagonist")?.value,$("relationships")?.value,$("bibleCharacterLook")?.value,$("bibleCharacterVoice")?.value].filter(Boolean).join("\n");
-  async function post(url,body) { const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw new Error(d.error||("Request failed ("+r.status+")"));return d; }
-  function stage(n,state) { const el=$("prodStage"+n);if(el){el.style.borderColor=state==="done"?"#aaa":state==="active"?"#777":"#292929";} }
-  function progress(p,msg) {$("prodBar").style.width=Math.round(p*100)+"%";$("prodProgress").textContent=msg;$("prodStatus").textContent=msg;}
-  function sceneList(ep,count) {
-    // Build the shot list from the selected episode only, with a clear episode boundary.
-    const raw=(ep.beats||"").split(/\n+/)
-      .map(x=>x.replace(/^\s*(?:\d+[.)-]|[-•])\s*/,"").trim())
-      .filter(Boolean);
-    const unique=[];
-    [ep.opening,...raw,ep.turn,ep.ending].filter(Boolean).forEach(item=>{
-      const text=String(item).trim();
-      if(text && !unique.some(existing=>existing.toLowerCase()===text.toLowerCase())) unique.push(text);
+  const world = () => [$("bibleWorld")?.value, $("setting")?.value, $("worldRules")?.value, $("bibleRules")?.value, $("bibleLocations")?.value].filter(Boolean).join("\n");
+  const chars = () => [$("protagonist")?.value, $("antagonist")?.value, $("relationships")?.value, $("bibleCharacterLook")?.value, $("bibleCharacterVoice")?.value].filter(Boolean).join("\n");
+  const style = ep => ep.visuals || $("bibleVisualStyle")?.value || $("tone")?.value || "original stylized animation";
+  async function post(url, body) {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    let d = {};
+    try { d = await r.json(); } catch (_) {}
+    if (!r.ok) throw new Error(d.error || ("Request failed (" + r.status + ")"));
+    return d;
+  }
+  function getPremises(ep) {
+    const beats = (ep.beats || "").split(/\n+/).map(x => x.replace(/^\s*(?:\d+[.)-]|[-•])\s*/, "").trim()).filter(Boolean);
+    const unique = [];
+    [ep.opening, ...beats, ep.turn, ep.ending].filter(Boolean).forEach(x => {
+      const text = String(x).trim();
+      if (text && !unique.some(y => y.toLowerCase() === text.toLowerCase())) unique.push(text);
     });
-    const arr=unique.slice(0,count);
-    while(arr.length<count) arr.push(ep.purpose||("A new discovery complicates the goal in Episode "+ep.number+"."));
-    return arr;
+    if (unique.length < 2 && ep.purpose) unique.push(ep.purpose);
+    if (unique.length < 2 && ep.character) unique.push(ep.character);
+    if (unique.length < 2) throw new Error("Episode 1 needs at least two story beats in Step 4. Add its opening, beats, turning point or ending, then try again.");
+    return unique.slice(0, 4);
   }
-  function promptFor(s,ep,i) { return 'Stylized animated scene '+(i+1)+' for "'+($("seriesTitle").value||"Untitled series")+'", episode '+ep.number+': '+ep.title+'. Scene: '+(s.action||s.premise||s.title)+'. World: '+world()+'. Characters: '+chars()+'. Visual direction: '+(ep.visuals||$("bibleVisualStyle")?.value||$("tone")?.value||"cinematic stylized animation")+'. Continuity: '+(ep.continuity||$("bibleContinuity")?.value||"Keep faces, clothing, props and locations consistent.")+'. Vertical 9:16, no photorealism, no live action, no logos or text.'; }
-  function renderScenes() {
-    const root=$("prodScenes");if(!scenes.length){root.innerHTML='<div class="empty">No scene breakdown yet.</div>';return;}
-    root.innerHTML=scenes.map((s,i)=>'<div class="prodscene"><div class="scene-card-head"><strong>Scene '+(i+1)+': '+esc(s.title||s.premise||"Story scene")+'</strong><span class="saved-meta">'+(s.clipUrl?"Clip ready":s.clipError?"Needs retry":"Prepared")+'</span></div><label class="label" for="prodPrompt'+i+'">Scene prompt</label><textarea id="prodPrompt'+i+'">'+esc(s.videoPrompt||"")+'</textarea><div class="prodrow"><button class="btn" data-retry="'+i+'" type="button">Regenerate scene</button></div>'+(s.clipUrl?'<video controls playsinline src="'+s.clipUrl+'"></video>':'<p class="help">'+esc(s.clipError||"Video clip not generated yet.")+'</p>')+'</div>').join("");
+  function videoPrompt(scene, ep, index) {
+    const sceneAction = scene.action || scene.premise || scene.title || "";
+    return "Create clip " + (index + 1) + " of 4 for a 30-second vertical animated episode. Series: " + ($("seriesTitle")?.value || "Untitled series") + ". Episode 1: " + ep.title + ". Story beat: " + scene.premise + ". Scene action: " + sceneAction + ". World and setting: " + world() + ". Character design: " + chars() + ". LOCKED VISUAL STYLE: " + style(ep) + ". Continuity: " + (ep.continuity || $("bibleContinuity")?.value || "Keep character appearance, wardrobe, props, geography, lighting and colour palette consistent across all clips.") + ". Family-safe original animation. Vertical 9:16. No photorealism, no live action, no logos, no text. This clip must continue the same story and match the other clips.";
   }
-  async function produce() {
-    if(busy)return;busy=true;$("prodStart").disabled=true;clips=[];scenes=[];const ep=dataForEpisode(),runtime=Number($("prodRuntime").value)||30,count=runtime===30?4:runtime===60?6:8,duration=Math.max(2,Math.min(15,Math.floor(runtime/count)));const premises=sceneList(ep,count);
-    for(let n=1;n<=4;n++)stage(n,"");
+  function renderBreakdown() {
+    $("sfSceneList").innerHTML = scenes.map((s, i) => `
+      <article class="sf-scene">
+        <div class="scene-card-head"><strong>Scene ${i + 1}: ${esc(s.title || s.premise || "Story beat")}</strong><span class="saved-meta">Scene ${i + 1} of ${scenes.length}</span></div>
+        <p>${esc(s.action || s.premise || "")}</p>
+        ${s.dialogue?.length ? '<p><strong>Dialogue</strong><br>' + s.dialogue.map(d => esc(d.character || "Character") + ': ' + esc(d.line || "")).join("<br>") + '</p>' : ""}
+        <label class="label" for="sfPrompt${i}">Visual prompt</label>
+        <textarea id="sfPrompt${i}">${esc(s.videoPrompt || "")}</textarea>
+      </article>`).join("");
+  }
+  function showWorking(target, text) {
+    $(target).classList.remove("hidden");
+    const node = $(text);
+    node.innerHTML = '<span class="sf-spinner"></span>' + esc("Preparing Episode 1…");
+  }
+  async function createBreakdown() {
+    if (busy) return;
+    busy = true; breakdownReady = false; scenes = [];
+    $("sfCreate").disabled = true; $("sfRetry").disabled = true; $("sfProduce").disabled = true;
+    $("sfDonePanel").classList.add("hidden"); $("sfBreakdownPanel").classList.add("hidden");
+    $("sfWorking").classList.remove("hidden");
+    $("sfStatus").textContent = "Creating Episode 1 scene breakdown…";
+    const ep = dataForEpisode();
+    $("sfEpisodeTitle").textContent = ep.title;
+    const statusMessages = ["Reading Episode 1's blueprint…", "Mapping the story beats…", "Building the scene sequence…", "Checking scene continuity…"];
+    let statusIndex = 0;
+    const ticker = setInterval(() => {
+      statusIndex = (statusIndex + 1) % statusMessages.length;
+      $("sfWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc(statusMessages[statusIndex]);
+    }, 1200);
     try {
-      stage(1,"active");progress(.02,"Breaking down Episode "+ep.number+" only: "+ep.title+"…");
-      for(let i=0;i<count;i++){const s=await post("/api/scene",{premise:premises[i]||ep.title,world:world(),characters:chars()});scenes.push({...s,number:i+1,premise:premises[i]});progress(.12*(i+1)/count,"Episode "+ep.number+" · scene "+(i+1)+" of "+count+" mapped…");}
-      stage(1,"done");stage(2,"active");progress(.15,"Preparing storyboard and continuity assets…");
-      const style=$("bibleVisualStyle")?.value||$("tone")?.value||"original stylized animation";
-      const assets=await Promise.all([post("/api/asset",{type:"character",subject:chars()||"main character",style,notes:ep.continuity}),post("/api/asset",{type:"environment",subject:world()||"series world",style,notes:ep.continuity})]);
-      for(let i=0;i<scenes.length;i++){scenes[i].storyboard=await post("/api/storyboard",{title:$("seriesTitle").value||"Untitled series",episode:Number(ep.number),episodeTitle:ep.title,premise:scenes[i].premise,scene:scenes[i],worldBible:world(),characterBible:chars(),visualStyle:style});scenes[i].assetPrompts=assets.map(a=>a.prompt);scenes[i].videoPrompt=promptFor(scenes[i],ep,i);progress(.15+.2*(i+1)/count,"Episode "+ep.number+" · storyboard "+(i+1)+" of "+count+" ready…");}
-      stage(2,"done");stage(3,"active");progress(.4,"Generating video clips. This can take a few minutes…");
-      for(let i=0;i<scenes.length;i++){try{const clip=await post("/api/video",{prompt:scenes[i].videoPrompt,model:"alibaba/wan-2.2-fast",duration,aspectRatio:"9:16",audio:true});if(!clip.url)throw new Error("No video returned.");scenes[i].clipUrl=clip.url;clips[i]=clip.url;}catch(e){scenes[i].clipError=e.message;renderScenes();throw new Error("Scene "+(i+1)+" failed: "+e.message+" Your scene plan is kept. Retry that scene in Edit & Export.");}progress(.4+.58*(i+1)/count,"Video clip "+(i+1)+" of "+count+" ready…");}
-      stage(3,"done");stage(4,"done");progress(1,"Episode ready for editing.");$("exportTitle").textContent="Episode "+ep.number+": "+ep.title;$("exportStatus").textContent=count+" clips ready.";renderScenes();setView("exportView");
-    } catch(e) { $("prodStatus").textContent=e.message||"Production failed."; $("prodProgress").textContent=e.message||"Production failed.";renderScenes(); }
-    finally {busy=false;$("prodStart").disabled=false;}
+      const premises = getPremises(ep);
+      for (let i = 0; i < premises.length; i++) {
+        const scene = await post("/api/scene", { premise: premises[i], world: world(), characters: chars() });
+        scenes.push({ ...scene, number: i + 1, premise: premises[i], videoPrompt: videoPrompt({ ...scene, premise: premises[i] }, ep, i) });
+        $("sfWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc("Building scene " + (i + 1) + " of " + premises.length + "…");
+      }
+      breakdownReady = true;
+      $("sfBreakdownTitle").textContent = "Episode 01 · " + ep.title;
+      $("sfDoneText").textContent = "Done. " + scenes.length + " scenes prepared for Episode 1. No video has been generated yet.";
+      $("sfDonePanel").classList.remove("hidden");
+      $("sfStatus").textContent = "Done. Open the scene breakdown to review it.";
+      $("sfCreate").textContent = "Recreate scene breakdown";
+    } catch (error) {
+      $("sfStatus").textContent = error.message || "Scene breakdown failed. Please try again.";
+      $("sfWorkingText").textContent = error.message || "Scene breakdown failed.";
+    } finally {
+      clearInterval(ticker);
+      $("sfWorking").classList.add("hidden");
+      busy = false; $("sfCreate").disabled = false; $("sfRetry").disabled = false; $("sfProduce").disabled = false;
+    }
   }
-  async function retry(i) { const s=scenes[i];if(!s)return;const p=$("prodPrompt"+i)?.value||s.videoPrompt; s.videoPrompt=p;s.clipError="";$("exportStatus").textContent="Regenerating scene "+(i+1)+"…";try{const runtime=Number($("prodRuntime").value)||30;const clip=await post("/api/video",{prompt:p,model:"alibaba/wan-2.2-fast",duration:Math.max(2,Math.min(15,Math.floor(runtime/scenes.length))),aspectRatio:"9:16",audio:true});s.clipUrl=clip.url;clips[i]=clip.url;$("exportStatus").textContent="Scene "+(i+1)+" regenerated.";}catch(e){s.clipError=e.message;$("exportStatus").textContent="Retry failed: "+e.message;}renderScenes();}
-  async function assemble() { const ready=scenes.map(s=>s.clipUrl).filter(Boolean);if(ready.length<scenes.length||ready.length<2){$("exportStatus").textContent="Finish or regenerate every scene before exporting the complete episode.";return;}$("prodAssemble").disabled=true;$("exportStatus").textContent="Assembling the MP4…";try{const r=await fetch("/api/assemble",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clips:ready,aspectRatio:"9:16"})});if(!r.ok){let d={};try{d=await r.json()}catch(e){}throw new Error(d.error||"Assembly failed.");}const blob=await r.blob();if(finalUrl)URL.revokeObjectURL(finalUrl);finalUrl=URL.createObjectURL(blob);$("prodFinal").src=finalUrl;$("prodDownload").href=finalUrl;$("prodFinalWrap").classList.remove("hidden");$("exportStatus").textContent="MP4 ready. Preview or download it.";}catch(e){$("exportStatus").textContent="Export failed: "+e.message;}finally{$("prodAssemble").disabled=false;}}
-  function saveNotes() { const value={settings:{episode:$("prodEpisode").value,runtime:$("prodRuntime").value,platform:$("prodPlatform").value,cadence:$("prodCadence").value},scenes:scenes.map((s,i)=>({title:s.title,premise:s.premise,videoPrompt:$("prodPrompt"+i)?.value||s.videoPrompt,storyboard:s.storyboard,clipStatus:s.clipUrl?"generated":s.clipError?"failed":"pending"}))};$("productionData").value=JSON.stringify(value);$("productionSettings").value=JSON.stringify(value.settings);$("saveProjectButton").click();$("exportStatus").textContent="Production notes copied into your project. Check the save status in Step 1.";}
+  async function produceVideo() {
+    if (busy || !breakdownReady || !scenes.length) return;
+    busy = true; $("sfProduce").disabled = true; $("sfRetry").disabled = true;
+    $("sfVideoResult").classList.add("hidden"); $("sfVideoWorking").classList.remove("hidden");
+    $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>Generating clip 1 of 4…';
+    $("sfStatus").textContent = "Producing Episode 1 as a 30-second vertical video…";
+    const tickerMessages = ["Applying your selected visual style…", "Rendering scene clips…", "Checking continuity between clips…", "Assembling the 30-second episode…"];
+    let statusIndex = 0;
+    const ticker = setInterval(() => {
+      statusIndex = (statusIndex + 1) % tickerMessages.length;
+      $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc(tickerMessages[statusIndex]);
+    }, 1600);
+    try {
+      const clips = [];
+      for (let i = 0; i < scenes.length; i++) {
+        scenes[i].videoPrompt = $("sfPrompt" + i)?.value || scenes[i].videoPrompt;
+        $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc("Generating clip " + (i + 1) + " of " + scenes.length + "…");
+        const clip = await post("/api/video", { prompt: scenes[i].videoPrompt, model: "alibaba/wan-2.2-fast", duration: CLIP_DURATIONS[i] || 7, aspectRatio: "9:16", audio: true });
+        if (!clip.url) throw new Error("The video provider returned no clip for scene " + (i + 1) + ".");
+        clips.push(clip.url);
+      }
+      $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>Assembling the finished episode…';
+      const response = await fetch("/api/assemble", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clips, aspectRatio: "9:16" }) });
+      if (!response.ok) {
+        let data = {};
+        try { data = await response.json(); } catch (_) {}
+        throw new Error(data.error || "Could not assemble the final video.");
+      }
+      const blob = await response.blob();
+      if (finalUrl) URL.revokeObjectURL(finalUrl);
+      finalUrl = URL.createObjectURL(blob);
+      $("sfFinalVideo").src = finalUrl;
+      $("sfDownload").href = finalUrl;
+      $("sfVideoResult").classList.remove("hidden");
+      $("sfStatus").textContent = "Episode 1 video is ready to preview or download.";
+    } catch (error) {
+      $("sfStatus").textContent = error.message || "Video production failed. Your scene breakdown is preserved.";
+    } finally {
+      clearInterval(ticker);
+      $("sfVideoWorking").classList.add("hidden");
+      busy = false; $("sfProduce").disabled = false; $("sfRetry").disabled = false;
+    }
+  }
   function init() {
     addUi();
-    if(!$("productionView"))return;
-    const fields=["productionData","productionSettings"];fields.forEach(id=>{if(!$(id)){const input=document.createElement("input");input.type="hidden";input.id=id;document.querySelector("main").appendChild(input);}});
-    const count=Math.max(1,Math.min(12,Number($("episodeCount")?.value)||8));$("prodEpisode").innerHTML=Array.from({length:count},(_,i)=>'<option value="'+(i+1)+'">Episode '+String(i+1).padStart(2,"0")+'</option>').join("");try{const saved=JSON.parse($("productionSettings").value||"{}");if(saved.episode)$("prodEpisode").value=saved.episode;if(saved.runtime)$("prodRuntime").value=saved.runtime;if(saved.platform)$("prodPlatform").value=saved.platform;if(saved.cadence)$("prodCadence").value=saved.cadence;}catch(e){}try{const savedData=JSON.parse($("productionData").value||"{}");if(Array.isArray(savedData.scenes)){scenes=savedData.scenes;$("exportTitle").textContent="Saved production notes";$("exportStatus").textContent="Saved scene notes restored. Video clips must be regenerated after a refresh.";}}catch(e){}renderCalendar();
-    $("finishBlueprintButton")?.addEventListener("click",()=>{setTimeout(()=>setView("productionView"),100);});
-    $("prodBack").addEventListener("click",()=>setView("episodeView"));$("prodCadence").addEventListener("change",()=>{renderCalendar();$("productionSettings").value=JSON.stringify({episode:$("prodEpisode").value,runtime:$("prodRuntime").value,platform:$("prodPlatform").value,cadence:$("prodCadence").value})});$("prodPlatform").addEventListener("change",()=>{renderCalendar();$("productionSettings").value=JSON.stringify({episode:$("prodEpisode").value,runtime:$("prodRuntime").value,platform:$("prodPlatform").value,cadence:$("prodCadence").value})});["prodEpisode","prodRuntime"].forEach(id=>$(id).addEventListener("change",()=>{$("productionSettings").value=JSON.stringify({episode:$("prodEpisode").value,runtime:$("prodRuntime").value,platform:$("prodPlatform").value,cadence:$("prodCadence").value})}));$("exportBack").addEventListener("click",()=>setView("productionView"));$("prodStart").addEventListener("click",produce);$("prodEdit").addEventListener("click",()=>{try{const saved=JSON.parse($("productionData").value||"{}");if(Array.isArray(saved.scenes))scenes=saved.scenes;if(saved.settings){if(saved.settings.episode)$("prodEpisode").value=saved.settings.episode;if(saved.settings.runtime)$("prodRuntime").value=saved.settings.runtime;if(saved.settings.platform)$("prodPlatform").value=saved.settings.platform;if(saved.settings.cadence)$("prodCadence").value=saved.settings.cadence;}}catch(e){}renderCalendar();renderScenes();setView("exportView")});$("prodAssemble").addEventListener("click",assemble);$("prodSave").addEventListener("click",saveNotes);
-    $("prodScenes").addEventListener("click",e=>{const b=e.target.closest("[data-retry]");if(b)retry(Number(b.dataset.retry));});
+    if (!$("productionView")) return;
+    $("productionData")?.remove();
+    $("productionSettings")?.remove();
+    $("sfBack").addEventListener("click", () => view("episodeView"));
+    $("finishBlueprintButton")?.addEventListener("click", () => setTimeout(() => view("productionView"), 100));
+    $("sfCreate").addEventListener("click", createBreakdown);
+    $("sfRetry").addEventListener("click", createBreakdown);
+    $("sfOpen").addEventListener("click", () => {
+      if (!breakdownReady) return;
+      renderBreakdown();
+      $("sfBreakdownPanel").classList.remove("hidden");
+      $("sfStatus").textContent = "Review Episode 1's scene breakdown before producing video.";
+      $("sfBreakdownPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    $("sfProduce").addEventListener("click", produceVideo);
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();
