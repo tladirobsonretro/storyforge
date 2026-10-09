@@ -25,6 +25,7 @@
       .sf-progress{height:5px;background:#292929;border-radius:10px;overflow:hidden;margin-top:16px}
       .sf-progress span{display:block;height:100%;width:35%;background:#eee;border-radius:10px;animation:sftravel 1.4s ease-in-out infinite}
       .sf-video{width:100%;max-height:65vh;background:#000;border-radius:10px;margin-top:14px}
+      #sfVideoErrorText{color:#ffb5b5;white-space:pre-wrap;overflow-wrap:anywhere}
       @keyframes sfspin{to{transform:rotate(360deg)}}
       @keyframes sftravel{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
       @media(max-width:640px){.sf-panel{padding:15px}}
@@ -57,7 +58,8 @@
             <button class="btn" id="sfRetry" type="button">Retry breakdown</button>
             <button class="btn primary" id="sfProduce" type="button">Produce video · 30 seconds ↗</button>
           </div>
-          <div id="sfVideoWorking" class="hidden" aria-live="polite"><p id="sfVideoWorkingText"><span class="sf-spinner"></span>Preparing video…</p><div class="sf-progress"><span></span></div></div>
+          <div id="sfVideoWorking" class="hidden" aria-live="polite"><p id="sfVideoWorkingText"><span class="sf-spinner"></span>Preparing video…</p><div class="sf-progress"><span></span></div><p class="section-copy">Video generation can take several minutes. Keep this page open.</p></div>
+          <div id="sfVideoError" class="sf-panel hidden" role="alert" style="border-color:#8d4242"><div class="section-title">Video generation stopped</div><p id="sfVideoErrorText" class="section-copy"></p><p class="section-copy">Your scene breakdown is still here. Correct the issue above, then retry without rebuilding the scenes.</p><button class="btn primary" id="sfVideoRetry" type="button">Retry video generation</button></div>
           <div id="sfVideoResult" class="hidden">
             <div class="section-title" style="margin-top:22px">Episode video ready</div>
             <video id="sfFinalVideo" class="sf-video" controls playsinline></video>
@@ -164,25 +166,23 @@
   async function produceVideo() {
     if (busy || !breakdownReady || !scenes.length) return;
     busy = true; $("sfProduce").disabled = true; $("sfRetry").disabled = true;
-    $("sfVideoResult").classList.add("hidden"); $("sfVideoWorking").classList.remove("hidden");
+    $("sfVideoResult").classList.add("hidden"); $("sfVideoError").classList.add("hidden"); $("sfVideoWorking").classList.remove("hidden");
     $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>Generating clip 1 of 4…';
     $("sfStatus").textContent = "Producing Episode 1 as a 30-second vertical video…";
-    const tickerMessages = ["Applying your selected visual style…", "Rendering scene clips…", "Checking continuity between clips…", "Assembling the 30-second episode…"];
-    let statusIndex = 0;
-    const ticker = setInterval(() => {
-      statusIndex = (statusIndex + 1) % tickerMessages.length;
-      $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc(tickerMessages[statusIndex]);
-    }, 1600);
+    let ticker = null;
     try {
+      const statusResponse = await fetch("/api/video-status", { cache: "no-store" });
+      const statusData = await statusResponse.json();
+      if (!statusResponse.ok || !statusData.configured) throw new Error(statusData.message || "Video generation is not connected. The server needs a valid POLLINATIONS_API_KEY.");
       const clips = [];
       for (let i = 0; i < scenes.length; i++) {
         scenes[i].videoPrompt = $("sfPrompt" + i)?.value || scenes[i].videoPrompt;
-        $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc("Generating clip " + (i + 1) + " of " + scenes.length + "…");
+        $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc("Sending scene " + (i + 1) + " of " + scenes.length + " to the video model. This can take several minutes…");
         const clip = await post("/api/video", { prompt: scenes[i].videoPrompt, model: "alibaba/wan-2.2-fast", duration: CLIP_DURATIONS[i] || 7, aspectRatio: "9:16", audio: true });
         if (!clip.url) throw new Error("The video provider returned no clip for scene " + (i + 1) + ".");
         clips.push(clip.url);
       }
-      $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>Assembling the finished episode…';
+      $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>All scene clips generated. Assembling the finished episode…';
       const response = await fetch("/api/assemble", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clips, aspectRatio: "9:16" }) });
       if (!response.ok) {
         let data = {};
@@ -197,9 +197,13 @@
       $("sfVideoResult").classList.remove("hidden");
       $("sfStatus").textContent = "Episode 1 video is ready to preview or download.";
     } catch (error) {
-      $("sfStatus").textContent = error.message || "Video production failed. Your scene breakdown is preserved.";
+      const message = error.message || "Video production failed. Your scene breakdown is preserved.";
+      $("sfStatus").textContent = "Video generation failed. Your scene breakdown is preserved.";
+      $("sfVideoErrorText").textContent = message;
+      $("sfVideoError").classList.remove("hidden");
+      console.error("StoryForge episode video generation failed:", error);
     } finally {
-      clearInterval(ticker);
+      if (ticker) clearInterval(ticker);
       $("sfVideoWorking").classList.add("hidden");
       busy = false; $("sfProduce").disabled = false; $("sfRetry").disabled = false;
     }
@@ -234,6 +238,7 @@
       $("sfBreakdownPanel").scrollIntoView({ behavior: "smooth", block: "start" });
     });
     $("sfProduce").addEventListener("click", produceVideo);
+    $("sfVideoRetry").addEventListener("click", produceVideo);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
