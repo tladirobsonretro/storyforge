@@ -10,6 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const videoReferenceDir = path.join(os.tmpdir(), "storyforge-video-references");
 const videoReferenceFiles = new Map();
+const videoClipFiles = new Map();
 fs.mkdirSync(videoReferenceDir, { recursive: true });
 
 app.use(express.json({ limit: "50mb" }));
@@ -308,6 +309,31 @@ app.get("/api/video-reference/:id", (req, res) => {
     return res.status(404).send("Reference image expired. Upload it again.");
   }
   res.setHeader("Content-Type", item.type);
+  res.setHeader("Cache-Control", "public, max-age=300");
+  res.sendFile(item.path);
+});
+
+app.post("/api/video-clip", (req, res) => {
+  const dataUrl = String(req.body?.dataUrl || "");
+  const match = dataUrl.match(/^data:video\/mp4;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return res.status(400).json({ error: "A generated MP4 clip is required." });
+  const bytes = Buffer.from(match[1], "base64");
+  if (bytes.length < 1000 || bytes.length > 20 * 1024 * 1024) return res.status(413).json({ error: "The clip is empty or exceeds the 20 MB limit." });
+  const id = crypto.randomUUID();
+  const diskPath = path.join(videoReferenceDir, id + ".mp4");
+  fs.writeFileSync(diskPath, bytes);
+  videoClipFiles.set(id, { path: diskPath, expiresAt: Date.now() + 3 * 60 * 60 * 1000 });
+  const base = String(process.env.RENDER_EXTERNAL_URL || (req.protocol + "://" + req.get("host"))).replace(/\/$/, "");
+  res.json({ url: base + "/api/video-clip/" + id, expiresInMinutes: 180 });
+});
+
+app.get("/api/video-clip/:id", (req, res) => {
+  const item = videoClipFiles.get(req.params.id);
+  if (!item || item.expiresAt < Date.now() || !fs.existsSync(item.path)) {
+    videoClipFiles.delete(req.params.id);
+    return res.status(404).send("Generated clip expired. Generate it again.");
+  }
+  res.setHeader("Content-Type", "video/mp4");
   res.setHeader("Cache-Control", "public, max-age=300");
   res.sendFile(item.path);
 });
@@ -860,11 +886,21 @@ function renderVideoTimeline(){
  if(!clips.length){timeline.textContent="Generate a clip, then add it here. Add at least two clips to export a complete MP4.";return}
  timeline.innerHTML=clips.map((c,i)=>"<div style='display:flex;gap:10px;align-items:center;border:1px solid #2a2a2a;background:#0d0d0d;padding:10px;border-radius:9px;margin-bottom:8px'><video muted playsinline src='"+c.url+"' style='width:88px;height:58px;object-fit:cover;background:#000;border-radius:5px'></video><div style='flex:1;min-width:0'><strong style='font-size:12px'>"+(i+1)+". "+escapeHtml(c.shot||c.title)+"</strong><div style='color:#888;font-size:11px;margin-top:4px'>"+escapeHtml(String(c.duration))+"s · "+escapeHtml(c.aspectRatio)+"</div></div><button class='copy-btn' style='margin:0' onclick='removeVideoClip("+i+")'>Remove</button></div>").join("");
 }
-function addVideoClipToTimeline(){
+async function addVideoClipToTimeline(){
  const clip=window.storyforgeCurrentVideo;if(!clip){toast("Generate a video clip first.");return}
  if(window.storyforgeVideoClips.length>=12){toast("The timeline supports up to 12 clips per export.");return}
- window.storyforgeVideoClips.push({...clip});
- renderVideoTimeline();document.getElementById("videoAddClipButton").disabled=true;toast("Clip added to timeline.");
+ const button=document.getElementById("videoAddClipButton");button.disabled=true;button.textContent="Saving clip…";
+ try{
+  let savedUrl=clip.url;
+  if(String(savedUrl).startsWith("data:video/")){
+   const response=await fetch("/api/video-clip",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataUrl:savedUrl})});
+   const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not save this clip to the timeline.");
+   savedUrl=data.url;window.storyforgeCurrentVideo={...clip,url:savedUrl};
+  }
+  window.storyforgeVideoClips.push({...clip,url:savedUrl});
+  renderVideoTimeline();toast("Clip added to timeline.");
+ }catch(error){button.disabled=false;toast(error.message||"Could not add clip.")}
+ finally{button.textContent="Add latest clip to timeline →"}
 }
 function removeVideoClip(index){window.storyforgeVideoClips.splice(index,1);renderVideoTimeline()}
 function clearVideoTimeline(){window.storyforgeVideoClips=[];renderVideoTimeline();toast("Timeline cleared.")}
