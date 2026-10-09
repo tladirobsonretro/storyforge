@@ -236,7 +236,7 @@ Continue for each planned episode. You can write rough notes first."></textarea>
 (function(){
  const $=id=>document.getElementById(id);
  const keys={projects:'storyforge-workshop-projects-v1',active:'storyforge-workshop-active-v1',imports:'storyforge-cloud-imported-local-v1'};
- const fields=['episodeBlueprints','seriesTitle','format','genre','audience','premise','hook','setting','worldRules','tone','protagonist','antagonist','relationships','conflict','engine','seasonDestination','cliffhanger','bibleWorld','bibleRules','bibleLocations','bibleTimeline','bibleCharacterLook','bibleCharacterVoice','bibleCharacterArc','bibleRelationships','bibleThemes','bibleVisualStyle','bibleContinuity','bibleForbidden','seasonPromise','seasonArc','seasonStart','seasonEnd','episodeCount','seasonFinale','seasonEpisodes','seasonThreads','seasonPacing'];
+ const fields=['productionData','productionSettings','episodeBlueprints','seriesTitle','format','genre','audience','premise','hook','setting','worldRules','tone','protagonist','antagonist','relationships','conflict','engine','seasonDestination','cliffhanger','bibleWorld','bibleRules','bibleLocations','bibleTimeline','bibleCharacterLook','bibleCharacterVoice','bibleCharacterArc','bibleRelationships','bibleThemes','bibleVisualStyle','bibleContinuity','bibleForbidden','seasonPromise','seasonArc','seasonStart','seasonEnd','episodeCount','seasonFinale','seasonEpisodes','seasonThreads','seasonPacing'];
  const db=window.supabase?.createClient('https://bbredattebczoalryvwg.supabase.co','sb_publishable_vhCQCuQ0BgmJ0yDv1U3-qg_2PJsAW-u',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  let selectedType='Video',activeId=null,currentUser=null,authMode='signin',authBusy=false;
  function readProjects(){try{const p=JSON.parse(localStorage.getItem(keys.projects)||'[]');return Array.isArray(p)?p:[]}catch(e){return []}}
@@ -275,7 +275,7 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  episodeFieldIds.forEach(id=>$(id).addEventListener('input',storeEpisode));
  $('saveEpisodeButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();$('episodeStatus').textContent=ok?'Episode '+episodeKey()+' blueprint saved.':'Save failed. Check the save status in Step 1.'});
  $('nextEpisodeButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();if(!ok)return;const current=Number(episodeKey())||1,count=Number($('episodeCount').value)||8,next=Math.min(count,current+1);$('blueprintEpisode').value=String(next);loadEpisode();$('episodeStatus').textContent=next===current?'Last planned episode selected. Review it or return to an earlier episode.':'Saved. Now working on Episode '+next+'.'});
- $('finishBlueprintButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();if(ok){await renderProjects();show('projectsView')}});
+ $('finishBlueprintButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();if(ok)show('productionView')});
  episodeBlueprints=loadEpisodeMap();refreshEpisodeOptions();
  $('backToFoundationFromSeason').addEventListener('click',()=>show('workshopView'));
  $('continueBibleButton').addEventListener('click',async()=>{await saveProject();$('bibleStatus').textContent='Review and expand the details below. Save when ready.';show('bibleView')});
@@ -297,5 +297,6 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  setAccountUI();updateCreate();
 })();
 </script>
+<script src="/production.js"></script>
 </body>
 </html>
