@@ -168,7 +168,8 @@ function buildStoryboard(input) {
   const premise = (input.premise || (scene && scene.action) || "the heroes discover something unexpected").trim();
   const worldBible = (input.worldBible || "").trim();
   const characterBible = (input.characterBible || "").trim();
-  const continuityPrefix = [worldBible && "WORLD BIBLE: " + worldBible, characterBible && "CHARACTER BIBLE: " + characterBible, "Maintain exact identity, proportions, wardrobe, signature accessories, environment geography, lighting language and colour palette across every shot."].filter(Boolean).join(" ");
+  const visualStyle = (input.visualStyle || "Original painterly cinematic stylized animation with expressive character design, hand-painted textures, bold graphic shadows, rich atmospheric lighting and distinctly South African retro-futurist environments; never photorealistic, hyperrealistic or live-action.").trim();
+  const continuityPrefix = ["LOCKED VISUAL STYLE: " + visualStyle, worldBible && "WORLD BIBLE: " + worldBible, characterBible && "CHARACTER BIBLE: " + characterBible, input.scene && "SCENE CONTEXT: " + JSON.stringify(input.scene), "Maintain exact identity, proportions, wardrobe, signature accessories, environment geography, lighting language and colour palette across every shot. Use stylized animated rendering only. No photorealism, hyperrealism or live-action aesthetics."].filter(Boolean).join(" ");
   const templates = [
     ["01","Extreme wide establishing","Slow aerial push-in","Establish the location and the scale of the world before the action begins.","Ambient environment, distant birds and soft score.","4s","cinematic establishing frame; original characters; consistent world design"],
     ["02","Wide shot","Gentle tracking movement","Reveal the heroes entering the location and noticing the first unusual detail.","Footsteps, environment and light dialogue.","4s","full-body character continuity; same outfits and proportions"],
@@ -208,7 +209,7 @@ app.post("/api/storyboard", async (req, res) => {
   try {
     const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
       method: "POST", headers: {"Authorization":"Bearer "+process.env.POLLINATIONS_API_KEY,"Content-Type":"application/json"},
-      body: JSON.stringify({model:"openai",messages:[{role:"system",content:"Turn the supplied animated scene into 8 original production-ready shots. Return ONLY JSON with key shots. Each shot needs number, scene, camera, action, audio, duration, visualPrompt. Preserve the supplied characters, world and dialogue."},{role:"user",content:"WORLD: "+(input.worldBible||"")+"\nCHARACTERS: "+(input.characterBible||"")+"\nSCENE: "+JSON.stringify(input.scene)}],temperature:0.8})
+      body: JSON.stringify({model:"openai",messages:[{role:"system",content:"Turn the supplied scene into exactly 8 original production-ready shots for a premium STYLIZED ANIMATED series. This is NOT live action and NOT photorealistic or hyperrealistic. Use painterly hand-crafted surfaces, expressive stylized faces, graphic shapes, dramatic illustrated lighting, textured brushwork and cinematic animated composition. Preserve the project’s locked visual style, world, character identities, outfits, props, geography and dialogue in every shot. Do not imitate any existing show or artist. Return ONLY valid JSON with key shots. Each shot needs number, scene, camera, action, audio, duration, visualPrompt. Every visualPrompt must explicitly repeat the locked style and the no-photorealism rule."},{role:"user",content:"LOCKED VISUAL STYLE: "+(input.visualStyle||"Original painterly cinematic stylized animation, not photorealistic")+"\nWORLD: "+(input.worldBible||"")+"\nCHARACTERS: "+(input.characterBible||"")+"\nSCENE: "+JSON.stringify(input.scene)}],temperature:0.65})
     });
     const data=await response.json();
     if(!response.ok) throw new Error("Storyboard model failed");
@@ -626,7 +627,7 @@ document.addEventListener("click", function(event) {
  }
 }, true);
 migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary();
-</script><script src="/story-create.js?v=2"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js"></script></body></html>`);
+</script><script src="/story-create.js?v=2"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js?v=2"></script><script src="/pipeline.js?v=1"></script></body></html>`);
 });
 
 app.listen(PORT, () => console.log(`StoryForge running on port ${PORT}`));
