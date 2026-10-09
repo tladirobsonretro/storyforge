@@ -3,8 +3,96 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>StoryForge</title>
-<style>html,body{margin:0;min-height:100%;background:#090909}body{min-height:100vh}</style>
+<meta name="theme-color" content="#0a0a0a">
+<title>StoryForge · Create anything</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0a0a;--panel:#111;--line:#292929;--muted:#8a8a8a;--text:#f5f5f5;--soft:#c9c9c9}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{min-height:100vh}
+button,input,textarea{font:inherit}
+.topbar{height:76px;display:flex;align-items:center;padding:0 clamp(20px,5vw,72px);border-bottom:1px solid #191919}
+.brand{display:inline-flex;align-items:center;gap:11px;color:var(--text);font-size:18px;font-weight:650;letter-spacing:-.65px;text-decoration:none}
+.brand-mark{width:29px;height:29px;border:1.7px solid #f3f3f3;border-radius:50%;display:grid;place-items:center;position:relative}
+.brand-mark:before{content:"";width:9px;height:9px;border:1.5px solid #f3f3f3;border-radius:50%;display:block}
+.brand-mark:after{content:"";position:absolute;width:5px;height:5px;background:#f3f3f3;border-radius:50%;right:1px;top:2px}
+main{width:min(850px,calc(100% - 36px));margin:0 auto;min-height:calc(100vh - 77px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:62px 0 100px}
+h1{margin:0 0 14px;text-align:center;font-size:clamp(30px,5vw,48px);line-height:1.12;letter-spacing:-1.9px;font-weight:560}
+.subheading{margin:0 0 34px;color:var(--muted);font-size:15px;text-align:center;line-height:1.6}
+.prompt-shell{width:100%;border:1px solid #343434;background:#101010;border-radius:17px;padding:16px;transition:border-color .18s,box-shadow .18s}
+.prompt-shell:focus-within{border-color:#656565;box-shadow:0 0 0 3px #ffffff08}
+textarea{display:block;width:100%;min-height:86px;resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font-size:16px;line-height:1.55;padding:4px 3px 12px}
+textarea::placeholder{color:#666}
+.prompt-footer{display:flex;justify-content:flex-end;align-items:center;gap:12px;border-top:1px solid #242424;padding-top:13px}
+.hint{margin-right:auto;color:#666;font-size:12px}
+.create{border:0;border-radius:10px;background:#f4f4f4;color:#101010;font-weight:650;padding:11px 19px;cursor:pointer;transition:opacity .15s,transform .15s}
+.create:hover:not(:disabled){transform:translateY(-1px);background:#fff}
+.create:disabled{opacity:.36;cursor:not-allowed}
+.categories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;margin-top:17px}
+.category{display:flex;align-items:center;justify-content:center;gap:10px;min-height:55px;border:1px solid #272727;background:transparent;color:#dedede;border-radius:12px;cursor:pointer;transition:background .16s,border-color .16s,color .16s}
+.category:hover{background:#141414;border-color:#484848}
+.category[aria-pressed="true"]{background:#f3f3f3;color:#111;border-color:#f3f3f3}
+.category svg{width:18px;height:18px;flex:none}
+.notice{min-height:22px;margin-top:17px;text-align:center;font-size:13px;color:#999}
+@media(max-width:520px){.topbar{height:65px}.brand{font-size:17px}main{padding-top:50px;justify-content:flex-start;margin-top:10vh}.subheading{font-size:14px;margin-bottom:25px}.prompt-shell{padding:12px}.categories{gap:8px}.category{min-height:52px;gap:7px;font-size:13px}.hint{font-size:11px}.create{padding:10px 15px}}
+</style>
 </head>
-<body></body>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" aria-label="StoryForge home">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span>StoryForge</span>
+  </a>
+</header>
+<main>
+  <h1>What do you want to create today?</h1>
+  <p class="subheading">Bring the idea. We'll build from there.</p>
+  <form class="prompt-shell" id="createForm">
+    <textarea id="prompt" aria-label="Describe what you want to create" placeholder="Describe what you have in mind..." maxlength="10000"></textarea>
+    <div class="prompt-footer">
+      <span class="hint">Start with a thought, a scene or a feeling.</span>
+      <button class="create" id="createButton" type="submit" disabled>Create <span aria-hidden="true">↗</span></button>
+    </div>
+  </form>
+  <div class="categories" role="group" aria-label="Choose a creation type">
+    <button class="category" type="button" data-type="Video" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="13" height="14" rx="2"></rect><path d="m16 10 5-3v10l-5-3"></path></svg>
+      <span>Video</span>
+    </button>
+    <button class="category" type="button" data-type="Audio" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+      <span>Audio</span>
+    </button>
+    <button class="category" type="button" data-type="Image" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="m21 15-5-5L5 21"></path></svg>
+      <span>Image</span>
+    </button>
+  </div>
+  <div class="notice" id="notice" role="status" aria-live="polite"></div>
+</main>
+<script>
+(function(){
+  const prompt=document.getElementById('prompt');
+  const createButton=document.getElementById('createButton');
+  const form=document.getElementById('createForm');
+  const notice=document.getElementById('notice');
+  const categories=[...document.querySelectorAll('.category')];
+  let selectedType='';
+  prompt.addEventListener('input',function(){createButton.disabled=!prompt.value.trim();notice.textContent='';});
+  categories.forEach(function(button){
+    button.addEventListener('click',function(){
+      selectedType=button.dataset.type;
+      categories.forEach(function(item){item.setAttribute('aria-pressed',String(item===button));});
+      notice.textContent=selectedType+' selected.';
+    });
+  });
+  form.addEventListener('submit',function(event){
+    event.preventDefault();
+    if(!prompt.value.trim()){prompt.focus();return;}
+    if(!selectedType){notice.textContent='Choose Video, Audio or Image to continue.';return;}
+    notice.textContent=selectedType+' is selected. This creation flow will be built next.';
+  });
+})();
+</script>
+</body>
 </html>
