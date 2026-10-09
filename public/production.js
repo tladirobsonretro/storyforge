@@ -240,7 +240,22 @@
     } catch (error) {
       const message = error.message || "Video production failed. Your scene breakdown is preserved.";
       $("sfStatus").textContent = "Video generation failed. Your scene breakdown is preserved.";
-      $("sfVideoErrorText").textContent = message;
+      const errorText = $("sfVideoErrorText");
+      errorText.textContent = message;
+      if (/402|insufficient balance|available paid balance/i.test(message)) {
+        const help = document.createElement("p");
+        help.className = "section-copy";
+        help.textContent = "The connected Pollinations account needs available Pollen before generation can continue.";
+        const topUp = document.createElement("a");
+        topUp.href = "https://enter.pollinations.ai/top-up";
+        topUp.target = "_blank";
+        topUp.rel = "noopener noreferrer";
+        topUp.textContent = "Open Pollinations top-up ↗";
+        topUp.className = "btn";
+        errorText.appendChild(help);
+        errorText.appendChild(document.createElement("br"));
+        errorText.appendChild(topUp);
+      }
       $("sfVideoError").classList.remove("hidden");
       console.error("StoryForge episode video generation failed:", error);
     } finally {
