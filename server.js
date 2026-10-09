@@ -254,22 +254,40 @@ app.post("/api/video-plan", (req, res) => {
 
 app.post("/api/video", async (req, res) => {
   if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({ error: "Video generation is not connected yet. Add POLLINATIONS_API_KEY in Render to enable it." });
-  const prompt = (req.body && req.body.prompt || "").trim();
-  const model = (req.body && req.body.model || "alibaba/wan-2.2-fast").trim();
-  const duration = Math.max(2, Math.min(10, Number(req.body.duration || 4)));
+  const prompt = String(req.body?.prompt || "").trim();
+  const model = String(req.body?.model || "wan").trim();
+  const duration = Math.max(2, Math.min(10, Number(req.body?.duration || 4)));
   if (!prompt) return res.status(400).json({ error: "A video prompt is required." });
   try {
-    const response = await fetch("https://gen.pollinations.ai/v1/videos/generations", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, prompt, duration, ...(req.body?.image ? { image: [req.body.image] } : {}), ...(Array.isArray(req.body?.referenceImages) && req.body.referenceImages.length ? { reference_images: req.body.referenceImages.slice(0, 3) } : {}) })
+    const params = new URLSearchParams({ model, duration: String(duration) });
+    if (req.body?.image) params.append("image", String(req.body.image));
+    if (Array.isArray(req.body?.referenceImages)) {
+      req.body.referenceImages.slice(0, 3).forEach((url) => params.append("reference_images", String(url)));
+    }
+    const endpoint = "https://gen.pollinations.ai/video/" + encodeURIComponent(prompt) + "?" + params.toString();
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Accept": "video/mp4, application/json" }
     });
-    const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "Video generation failed." });
-    const url = data.data?.[0]?.url || data.data?.[0]?.b64_json;
-    if (!url) return res.status(502).json({ error: "The video provider returned no video." });
-    res.json({ url, model, duration });
-  } catch (error) { res.status(502).json({ error: "Video provider could not be reached." }); }
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok) {
+      const body = await response.text();
+      let message = body;
+      try { const parsed = JSON.parse(body); message = parsed.error?.message || parsed.error || parsed.message || body; } catch (_) {}
+      return res.status(response.status).json({ error: "Video provider error (" + response.status + "): " + String(message).slice(0, 500) });
+    }
+    if (contentType.includes("application/json") || contentType.includes("text/")) {
+      const body = await response.text();
+      return res.status(502).json({ error: "The video provider returned a message instead of a video: " + body.slice(0, 400) });
+    }
+    const video = Buffer.from(await response.arrayBuffer());
+    if (video.length < 1000) return res.status(502).json({ error: "The video provider returned an empty or incomplete video. Please try again." });
+    if (video.length > 20 * 1024 * 1024) return res.status(502).json({ error: "The generated clip exceeds the 20 MB preview limit. Try a shorter clip." });
+    res.json({ url: "data:video/mp4;base64," + video.toString("base64"), model, duration, bytes: video.length });
+  } catch (error) {
+    console.error("StoryForge video generation failed:", error);
+    res.status(502).json({ error: "Video generation could not finish. Please try again. " + (error.message || "") });
+  }
 });
 
 app.post("/api/assemble", async (req, res) => {
@@ -611,14 +629,41 @@ async function buildVideoPlan(){
 }
 
 async function generateVideo(){
- const prompt=(document.getElementById("videoTitle").value||"cinematic animated adventure").trim()+"; original characters, cinematic motion, coherent environment, polished animation";
- const button=document.getElementById("videoGenerateButton"); button.disabled=true; button.textContent="Generating clip…";
+ const button=document.getElementById("videoGenerateButton");
+ const output=document.getElementById("toolOutput");
+ const title=(document.getElementById("videoTitle")?.value||"THE QUEUE").trim();
+ button.disabled=true;button.textContent="Rendering video…";
+ output.style.display="block";
+ output.innerHTML="<h4>Rendering your video…</h4><p style='color:#aaa'>StoryForge is asking the video model to create a moving clip. This can take a few minutes. Keep this page open.</p><div class='reference-spinner' style='margin:16px 0;width:28px;height:28px'></div>";
  try{
-  const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:"alibaba/wan-2.2-fast",duration:4})});
-  const data=await response.json(); if(!response.ok) throw new Error(data.error||"Video generation failed.");
-  toolOutput.style.display="block"; toolOutput.innerHTML+="<h4 style='margin-top:18px'>Generated test clip</h4><video controls playsinline src='"+data.url+"' style='width:100%;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#666;font-size:11px'>Generated with "+data.model+" · "+data.duration+"s.</p>";
-  toast("Video clip generated.");
- }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Render Video →"}
+  const bible=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-bible")||"{}")}catch(_){return {}}})();
+  const state=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-state")||"{}")}catch(_){return {}}})();
+  const shots=Array.isArray(state.shots)?state.shots:[];
+  const selectedShot=shots[0]||{};
+  const world=bible.world||state.world||window.storyforgeWorldBible||"retro-futuristic South Africa in 2094";
+  const characters=bible.characters||state.characters||window.storyforgeCharacterBible||"Thabo Ndlovu, Nomsa Khumalo, Aiden Mokoena, Rafiq Sayed and Zola Maseko";
+  const scene=bible.scene||state.scene||window.storyforgeScene||{};
+  const shotDescription=[selectedShot.shotType,selectedShot.camera,selectedShot.action,selectedShot.visualPrompt].filter(Boolean).join(". ");
+  const prompt=[
+   "Create a finished "+Math.max(2,Math.min(10,Number(document.getElementById("videoDuration")?.value||4)))+"-second cinematic animated video clip for the original series "+title+".",
+   "LOCKED VISUAL STYLE: original painterly, highly stylized animation; expressive hand-designed characters; hand-painted textures; bold graphic shadows; cinematic illustrated lighting; atmospheric depth; retro-futuristic South African environments. STRICTLY animated, never photorealistic, hyperrealistic or live-action.",
+   "WORLD: "+String(world),
+   "CHARACTERS AND CONTINUITY: "+String(characters),
+   "SCENE CONTEXT: "+JSON.stringify(scene),
+   "STORYBOARD SHOT: "+(shotDescription||"A cinematic establishing moment in the story world."),
+   "Use coherent continuous motion, stable character identity, clear composition, natural movement and a deliberate camera move. No titles, captions, logos or watermarks."
+  ].join("\n");
+  const duration=Math.max(2,Math.min(10,Number(document.getElementById("videoDuration")?.value||4)));
+  const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:"wan",duration})});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"Video generation failed.");
+  if(!data.url||!String(data.url).startsWith("data:video/"))throw new Error("The provider did not return a playable video file.");
+  output.innerHTML="<h4>Video rendered successfully</h4><p><strong>"+escapeHtml(title)+"</strong> · "+escapeHtml(String(data.duration||duration))+"s</p><video controls autoplay playsinline src='"+data.url+"' style='display:block;width:100%;max-height:620px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#aaa;font-size:12px;margin-top:10px'>Your generated video is ready. Use the player controls to replay it.</p><button class='copy-btn' onclick='generateVideo()'>Render another clip →</button>";
+  toast("Video rendered successfully.");
+ }catch(error){
+  output.innerHTML="<h4>Video could not be rendered</h4><p style='color:#f0a0a0'>"+escapeHtml(error.message||"Unknown video error")+"</p><p style='color:#aaa'>Your saved story, characters and storyboard are unchanged. You can retry after correcting the provider error.</p><button class='copy-btn' onclick='generateVideo()'>Try rendering again →</button>";
+  toast(error.message||"Video generation failed.");
+ }finally{button.disabled=false;button.textContent="Render Video →"}
 }
 
 async function buildAsset(){
