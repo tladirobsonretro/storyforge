@@ -534,12 +534,52 @@ async function buildStoryboard(){
  toast("Storyboard forged: "+data.shots.length+" shots.");
 }
 async function buildVideoPlan(){
- const payload={title:videoTitle.value,format:videoFormat.value,shots:videoShots.value,duration:videoDuration.value,captions:videoCaptions.value==="yes"};
- const response=await fetch("/api/video-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
- const data=await response.json(); if(!response.ok){toast(data.error||"Video plan failed");return}
- toolOutput.style.display="block";
- toolOutput.innerHTML="<h4>Video edit plan ready</h4><p><strong>"+data.title+"</strong> · "+data.format+" · "+data.aspectRatio+" · "+data.duration+"s</p><p><strong>Audio:</strong> "+data.audio+"</p><p><strong>Captions:</strong> "+(data.captions?"Enabled":"Disabled")+"</p><h4 style='margin-top:18px'>Render plan</h4><p>"+data.renderPlan.map((x,i)=>(i+1)+". "+x).join("<br>")+"</p><p style='color:#777;font-size:12px'>Status: "+data.status+" · This is the edit-plan layer. Actual video rendering comes next.</p>";
- toast("Video edit plan built.");
+  const button=[...document.querySelectorAll("button")].find(b=>/build edit plan/i.test(b.textContent||""));
+  if(window.storyforgeBuildingEditPlan)return;
+  window.storyforgeBuildingEditPlan=true;
+  const originalText=button?button.textContent:"Build edit plan →";
+  let overlay=document.getElementById("videoPlanLoadingOverlay");
+  if(!overlay){
+    overlay=document.createElement("div");overlay.id="videoPlanLoadingOverlay";
+    overlay.style.cssText="position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.78);backdrop-filter:blur(5px)";
+    overlay.innerHTML="<div role='status' aria-live='polite' style='width:min(420px,100%);padding:26px;border:1px solid #383838;border-radius:16px;background:#151515;color:#f5f5f5;text-align:center;box-shadow:0 20px 80px #0009'><div class='reference-spinner' style='margin:0 auto 18px;width:34px;height:34px'></div><h3 style='margin:0 0 9px;font-size:18px'>Building your edit plan…</h3><p style='margin:0;color:#aaa;font-size:13px;line-height:1.6'>StoryForge is organising your shots, format, timing, audio and captions. Keep this page open.</p><p id='videoPlanLoadingStatus' style='margin:14px 0 0;color:#777;font-size:11px'>Waiting for the edit-plan service…</p></div>";
+    document.body.appendChild(overlay);
+  }
+  if(button){button.disabled=true;button.textContent="Building edit plan…";}
+  const output=document.getElementById("toolOutput");
+  if(output){output.style.display="block";output.innerHTML="<p style='color:#aaa'>Building your edit plan… this may take a moment.</p>";}
+  try{
+    const p=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-bible")||"{}")}catch(_){return {}}})();
+    const state=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-state")||"{}")}catch(_){return {}}})();
+    const savedShots=Array.isArray(state.shots)?state.shots:[];
+    const shotInput=(typeof videoShots!=="undefined"&&videoShots?videoShots.value:"").trim();
+    const payload={
+      title:(typeof videoTitle!=="undefined"&&videoTitle?videoTitle.value:"").trim()||p.title||state.title||"THE QUEUE",
+      format:typeof videoFormat!=="undefined"&&videoFormat?videoFormat.value:"short",
+      shots:shotInput||String(savedShots.length||8),
+      duration:typeof videoDuration!=="undefined"&&videoDuration?videoDuration.value:"30",
+      captions:typeof videoCaptions!=="undefined"&&videoCaptions?videoCaptions.value==="yes":true,
+      world:p.world||state.world||window.storyforgeWorldBible||"",
+      characters:p.characters||state.characters||window.storyforgeCharacterBible||"",
+      scene:p.scene||state.scene||window.storyforgeScene||{},
+      storyboard:savedShots
+    };
+    const response=await fetch("/api/video-plan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||"The edit-plan service returned an error.");
+    if(output){
+      const steps=Array.isArray(data.renderPlan)?data.renderPlan:[];
+      output.innerHTML="<h4>Video edit plan ready</h4><p><strong>"+escapeHtml(data.title||payload.title)+"</strong> · "+escapeHtml(data.format||payload.format)+" · "+escapeHtml(data.aspectRatio||"")+" · "+escapeHtml(String(data.duration||payload.duration))+"s</p><p><strong>Audio:</strong> "+escapeHtml(data.audio||"Not specified")+"</p><p><strong>Captions:</strong> "+((data.captions??payload.captions)?"Enabled":"Disabled")+"</p><h4 style='margin-top:18px'>Render plan</h4><ol>"+steps.map(x=>"<li>"+escapeHtml(String(x))+"</li>").join("")+"</ol><p style='color:#777;font-size:12px'>Status: "+escapeHtml(data.status||"Ready")+" · Edit plan created. Actual video rendering is a separate step.</p>";
+    }
+    toast("Video edit plan built.");
+  }catch(error){
+    if(output)output.innerHTML="<h4>Could not build the edit plan</h4><p style='color:#f0a0a0'>"+escapeHtml(error.message||"Unknown error")+"</p><p style='color:#aaa'>Check your connection and try again. Your story and storyboard remain saved.</p><button class='copy-btn' onclick='buildVideoPlan()'>Try again →</button>";
+    toast("Edit plan failed: "+(error.message||"Unknown error"));
+  }finally{
+    const current=document.getElementById("videoPlanLoadingOverlay");if(current)current.remove();
+    window.storyforgeBuildingEditPlan=false;
+    if(button){button.disabled=false;button.textContent=originalText;}
+  }
 }
 
 async function generateVideo(){
