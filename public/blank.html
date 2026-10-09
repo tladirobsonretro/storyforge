@@ -221,7 +221,7 @@ Continue for each planned episode. You can write rough notes first."></textarea>
       </div>
       <div class="production-note"><strong>Blueprint rule:</strong> Every episode needs a goal, rising pressure, a meaningful turn and an ending that feels earned. We will break approved blueprints into scenes and shots in the next stage.</div>
       <div class="save-row"><button class="btn" id="saveEpisodeButton" type="button">Save Episode Blueprint</button><button class="btn primary" id="nextEpisodeButton" type="button">Save and go to next episode →</button></div>
-      <div class="save-row"><button class="btn" id="backToFoundationFromEpisode" type="button">Return to Step 1</button><button class="btn" id="finishBlueprintButton" type="button">Save and review project</button></div>
+      <div class="save-row"><button class="btn primary" id="finishBlueprintButton" type="button">Save episodes & continue to Step 5: Produce Episode →</button></div>
     </div>
   </section>
 
@@ -269,7 +269,7 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  $('saveSeasonButton').addEventListener('click',saveSeason);
  $('continueEpisodeButton').addEventListener('click',async()=>{const ok=await saveSeason();if(!ok)return;episodeBlueprints=loadEpisodeMap();refreshEpisodeOptions();show('episodeView')});
  $('backToSeason').addEventListener('click',()=>{storeEpisode();show('seasonView')});
- $('backToFoundationFromEpisode').addEventListener('click',async()=>{storeEpisode();await saveProject();show('workshopView')});
+
  $('blueprintEpisode').addEventListener('change',()=>{storeEpisode();loadEpisode()});
  $('episodeCount').addEventListener('change',()=>{storeEpisode();refreshEpisodeOptions()});
  episodeFieldIds.forEach(id=>$(id).addEventListener('input',storeEpisode));
