@@ -11,6 +11,17 @@
   const worldText = () => { const w=read().world || storyBible().world; if (typeof w==="string") return w; if (w) return JSON.stringify(w); return window.storyforgeWorldBible || ""; };
   const syncContext = () => {
     const p=read(), chars=charactersText();
+    let episodeField=byId("boardEpisode");
+    if(episodeField && Array.isArray(p.episodes) && p.episodes.length) {
+      if(episodeField.tagName!=="SELECT") {
+        const select=document.createElement("select");select.id="boardEpisode";select.className=episodeField.className;episodeField.replaceWith(select);episodeField=select;
+      }
+      const previous=episodeField.value||String(p.episode?.number||1);
+      episodeField.innerHTML=p.episodes.map((ep,i)=>"<option value='"+(ep.number||i+1)+"' data-title='"+String(ep.title||"").replace(/&/g,"&amp;").replace(/'/g,"&#39;")+"' data-summary='"+String(ep.summary||"").replace(/&/g,"&amp;").replace(/'/g,"&#39;")+"'>Episode "+(ep.number||i+1)+": "+String(ep.title||"Untitled").replace(/</g,"&lt;")+"</option>").join("");
+      if([...episodeField.options].some(o=>o.value===previous))episodeField.value=previous;
+      if(!episodeField.dataset.sfBound){episodeField.dataset.sfBound="1";episodeField.addEventListener("change",()=>{const option=episodeField.options[episodeField.selectedIndex];if(!option)return;const title=byId("boardEpisodeTitle"),premise=byId("boardPremise");if(title)title.value=option.dataset.title||"";if(premise)premise.value=option.dataset.summary||"";write({episode:{number:Number(option.value),title:option.dataset.title||"",summary:option.dataset.summary||""}});});}
+      const selected=episodeField.options[episodeField.selectedIndex];if(selected){if(byId("boardEpisodeTitle")&&!val("boardEpisodeTitle"))byId("boardEpisodeTitle").value=selected.dataset.title||"";if(byId("boardPremise")&&!val("boardPremise"))byId("boardPremise").value=selected.dataset.summary||"";}
+    }
     if (p.title) {
       if (byId("boardTitle") && !val("boardTitle")) byId("boardTitle").value=p.title;
       if (byId("videoTitle") && !val("videoTitle")) byId("videoTitle").value=p.title;
@@ -46,7 +57,19 @@
   }
   function saveStoryFromPage() {
     const title=val("resultTitle") || val("boardTitle") || val("videoTitle");
-    if(title) write({title, idea:val("idea")||read().idea||"", logline:byId("logline")?.textContent||read().logline||""});
+    const episodeRows=[...(byId("episodes")?.children||[])];
+    const episodes=episodeRows.map((row,i)=>({number:i+1,title:row.querySelector("strong")?.textContent?.replace(/^\\d+\\.\\s*/,"")||"Episode "+(i+1),summary:row.querySelector("span")?.textContent||""})).filter(e=>e.title);
+    if(title) write({title,idea:val("idea")||read().idea||"",logline:byId("logline")?.textContent||read().logline||"",episodes:episodes.length?episodes:read().episodes||[],world:byId("world")?.textContent||read().world||""});
+  }
+  function bootstrapSavedStory() {
+    const existing=read(); if(existing.title)return;
+    try {
+      const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");
+      if(!Array.isArray(projects)||!projects.length)return;
+      const p=projects.find(x=>/the queue/i.test((x.title||"")+" "+(x.data?.title||"")))||projects[0];
+      const d=p.data||{};
+      write({title:d.title||p.title||"",idea:p.idea||"",logline:d.logline||"",world:d.world||"",episodes:Array.isArray(d.episodes)?d.episodes:[],characters:Array.isArray(d.characters)?d.characters:[]});
+    } catch (_) {}
   }
   function installWrapper(name, after) {
     const original=window[name]; if(typeof original!=="function"||original.__sfWrapped)return;
@@ -62,6 +85,7 @@
     const toolPanel=byId("toolPanel");
     if(toolPanel&&!byId("storyforgeFlow")){const root=document.createElement("section");root.id="storyforgeFlow";root.className="sf-flow";toolPanel.parentNode.insertBefore(root,toolPanel);}
     injectStyles();
+    bootstrapSavedStory();
     const p=read(); if(!p.visualStyle)write({visualStyle:STYLE});
     syncContext();
     installWrapper("createStory",()=>{saveStoryFromPage();const title=val("resultTitle")||val("idea");if(title)write({title,idea:val("idea"),logline:byId("logline")?.textContent||""});syncContext();});
