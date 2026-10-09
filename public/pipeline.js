@@ -62,13 +62,13 @@
     if(title) write({title,idea:val("idea")||read().idea||"",logline:byId("logline")?.textContent||read().logline||"",episodes:episodes.length?episodes:read().episodes||[],world:byId("world")?.textContent||read().world||""});
   }
   function bootstrapSavedStory() {
-    const existing=read(); if(existing.title)return;
+    const existing=read(); if(existing.title&&Array.isArray(existing.episodes)&&existing.episodes.length)return;
     try {
       const projects=JSON.parse(localStorage.getItem("storyforge-projects")||"[]");
       if(!Array.isArray(projects)||!projects.length)return;
       const p=projects.find(x=>/the queue/i.test((x.title||"")+" "+(x.data?.title||"")))||projects[0];
       const d=p.data||{};
-      write({title:d.title||p.title||"",idea:p.idea||"",logline:d.logline||"",world:d.world||"",episodes:Array.isArray(d.episodes)?d.episodes:[],characters:Array.isArray(d.characters)?d.characters:[]});
+      write({title:existing.title||d.title||p.title||"",idea:existing.idea||p.idea||"",logline:existing.logline||d.logline||"",world:existing.world||d.world||"",episodes:Array.isArray(existing.episodes)&&existing.episodes.length?existing.episodes:(Array.isArray(d.episodes)?d.episodes:[]),characters:existing.characters||d.characters||[]});
     } catch (_) {}
   }
   function installWrapper(name, after) {
