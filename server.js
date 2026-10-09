@@ -8,7 +8,7 @@ const ffmpegPath = require("ffmpeg-static");
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 app.use(express.static("public"));
 
 function buildStory(idea) {
