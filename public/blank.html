@@ -197,8 +197,31 @@ Continue for each planned episode. You can write rough notes first."></textarea>
         <div class="field full"><label class="label" for="seasonFinale">Finale and next-season hook</label><textarea id="seasonFinale" class="tall" placeholder="Describe the main confrontation or revelation, what it costs, what is resolved and the final beat that makes the next season matter."></textarea></div>
       </div>
       <div class="production-note"><strong>Planning rule:</strong> Every episode should move at least one major story forward. The outline should fit your audience, format and available production capacity. Do not split the story into 30-second clips yet; first make sure the season works as a story.</div>
-      <div class="save-row"><button class="btn" id="saveSeasonButton" type="button">Save Season Plan</button><button class="btn primary" id="backToFoundationFromSeason" type="button">Return to Step 1</button></div>
+      <div class="save-row"><button class="btn" id="saveSeasonButton" type="button">Save Season Plan</button><button class="btn" id="backToFoundationFromSeason" type="button">Return to Step 1</button><button class="btn primary" id="continueEpisodeButton" type="button">Continue to Step 4 →</button></div>
       <p class="footer-note">Step 4 can later break each approved episode into scenes and shots for production.</p>
+    </div>
+  </section>
+
+  <section id="episodeView" class="hidden">
+    <div class="workshop-head"><div><div class="eyebrow">Story Workshop · Step 4</div><h1>Build an episode blueprint</h1><p class="subheading" style="text-align:left">Turn the season map into a detailed plan for each episode. This is the story blueprint, not the final script or video yet.</p><div class="status" id="episodeStatus" aria-live="polite">Episode blueprint · draft</div></div><button class="btn" id="backToSeason" type="button">← Step 3: Season Plan</button></div>
+    <div class="panel">
+      <div class="section-title">Choose an episode</div><p class="section-copy">Complete one episode at a time. Each episode has its own saved blueprint.</p>
+      <div class="field-grid">
+        <div class="field"><label class="label" for="blueprintEpisode">Episode</label><select id="blueprintEpisode"></select></div>
+        <div class="field"><label class="label" for="episodeRuntime">Target runtime</label><select id="episodeRuntime"><option>30 seconds</option><option>1–3 minutes</option><option>3–5 minutes</option><option>5–10 minutes</option><option>10–15 minutes</option><option>20–30 minutes</option><option>30–60 minutes</option></select></div>
+        <div class="field full"><label class="label" for="episodeTitle">Episode title</label><input id="episodeTitle" placeholder="A short, memorable title"></div>
+        <div class="field full"><label class="label" for="episodePurpose">Episode purpose</label><textarea id="episodePurpose" placeholder="What changes because this episode exists? What should the audience understand, feel or wonder by the end?"></textarea></div>
+        <div class="field"><label class="label" for="episodeOpening">Opening hook</label><textarea id="episodeOpening" placeholder="What grabs attention in the first moments?"></textarea></div>
+        <div class="field"><label class="label" for="episodeTurn">Major turning point</label><textarea id="episodeTurn" placeholder="What discovery, decision or event changes the direction?"></textarea></div>
+        <div class="field full"><label class="label" for="episodeBeats">Story beats / scene sequence</label><textarea id="episodeBeats" class="tall" placeholder="1. Setup and immediate goal&#10;2. First obstacle&#10;3. Complication or reveal&#10;4. Choice and consequence&#10;5. Climax&#10;6. Resolution"></textarea></div>
+        <div class="field"><label class="label" for="episodeCharacterBeat">Character development</label><textarea id="episodeCharacterBeat" placeholder="What does the protagonist want, choose, learn or get wrong? How do relationships shift?"></textarea></div>
+        <div class="field"><label class="label" for="episodeEnding">Ending hook</label><textarea id="episodeEnding" placeholder="What makes the audience want the next episode?"></textarea></div>
+        <div class="field full"><label class="label" for="episodeContinuity">Continuity checks</label><textarea id="episodeContinuity" placeholder="Facts, props, injuries, promises, locations, timelines and clues that must stay consistent."></textarea></div>
+        <div class="field full"><label class="label" for="episodeVisuals">Visual and sound direction</label><textarea id="episodeVisuals" placeholder="Key locations, visual moments, mood, sound, music or recurring motifs. Shot-by-shot prompts come later."></textarea></div>
+      </div>
+      <div class="production-note"><strong>Blueprint rule:</strong> Every episode needs a goal, rising pressure, a meaningful turn and an ending that feels earned. We will break approved blueprints into scenes and shots in the next stage.</div>
+      <div class="save-row"><button class="btn" id="saveEpisodeButton" type="button">Save Episode Blueprint</button><button class="btn primary" id="nextEpisodeButton" type="button">Save and go to next episode →</button></div>
+      <div class="save-row"><button class="btn" id="backToFoundationFromEpisode" type="button">Return to Step 1</button><button class="btn" id="finishBlueprintButton" type="button">Save and review project</button></div>
     </div>
   </section>
 
@@ -213,12 +236,12 @@ Continue for each planned episode. You can write rough notes first."></textarea>
 (function(){
  const $=id=>document.getElementById(id);
  const keys={projects:'storyforge-workshop-projects-v1',active:'storyforge-workshop-active-v1',imports:'storyforge-cloud-imported-local-v1'};
- const fields=['seriesTitle','format','genre','audience','premise','hook','setting','worldRules','tone','protagonist','antagonist','relationships','conflict','engine','seasonDestination','cliffhanger','bibleWorld','bibleRules','bibleLocations','bibleTimeline','bibleCharacterLook','bibleCharacterVoice','bibleCharacterArc','bibleRelationships','bibleThemes','bibleVisualStyle','bibleContinuity','bibleForbidden','seasonPromise','seasonArc','seasonStart','seasonEnd','episodeCount','seasonFinale','seasonEpisodes','seasonThreads','seasonPacing'];
+ const fields=['episodeBlueprints','seriesTitle','format','genre','audience','premise','hook','setting','worldRules','tone','protagonist','antagonist','relationships','conflict','engine','seasonDestination','cliffhanger','bibleWorld','bibleRules','bibleLocations','bibleTimeline','bibleCharacterLook','bibleCharacterVoice','bibleCharacterArc','bibleRelationships','bibleThemes','bibleVisualStyle','bibleContinuity','bibleForbidden','seasonPromise','seasonArc','seasonStart','seasonEnd','episodeCount','seasonFinale','seasonEpisodes','seasonThreads','seasonPacing'];
  const db=window.supabase?.createClient('https://bbredattebczoalryvwg.supabase.co','sb_publishable_vhCQCuQ0BgmJ0yDv1U3-qg_2PJsAW-u',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
  let selectedType='Video',activeId=null,currentUser=null,authMode='signin',authBusy=false;
  function readProjects(){try{const p=JSON.parse(localStorage.getItem(keys.projects)||'[]');return Array.isArray(p)?p:[]}catch(e){return []}}
  function writeProjects(p){localStorage.setItem(keys.projects,JSON.stringify(p))}
- function show(view){['homeView','workshopView','bibleView','seasonView','projectsView','authView'].forEach(id=>$(id).classList.toggle('hidden',id!==view));window.scrollTo({top:0,behavior:'instant'})}
+ function show(view){['homeView','workshopView','bibleView','seasonView','episodeView','projectsView','authView'].forEach(id=>$(id).classList.toggle('hidden',id!==view));window.scrollTo({top:0,behavior:'instant'})}
  function updateCreate(){$('createButton').disabled=!$('idea').value.trim()}
  function setAccountUI(){$('authButton').classList.toggle('hidden',!!currentUser);$('signOutButton').classList.toggle('hidden',!currentUser);$('projectsFootnote').textContent=currentUser?'Signed in as '+currentUser.email+'. Projects are stored in your cloud workspace.':'Sign in to sync projects across devices. Existing local projects can be imported.';$('storageFootnote').textContent=currentUser?'Cloud sync is on for '+currentUser.email+'. Save changes to access them on other devices.':'Sign in to sync your series foundation across devices. This step does not call an AI, image or video generation service.'}
  function newProject(){activeId=null;fields.forEach(id=>{if(id==='format')$(id).value='Animated series';else $(id).value=''});$('premise').value=$('idea').value.trim();const raw=$('idea').value.trim().replace(/\s+/g,' ');$('seriesTitle').value=raw?(raw.length>52?raw.slice(0,49).replace(/\s+\S*$/,'')+'…':raw):'';$('saveStatus').textContent='Not saved yet';$('workshopHeading').textContent='Your series foundation';show('workshopView')}
@@ -232,11 +255,28 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  async function renderProjects(){const root=$('savedProjects');root.innerHTML='<div class="empty">Loading projects…</div>';try{const projects=await listProjects();if(!projects.length){root.innerHTML='<div class="empty">No projects yet. Start with an idea and save your first series foundation.</div>';return}root.innerHTML=projects.map(p=>'<div class="saved-item"><div><div class="saved-title">'+escapeHtml(p.seriesTitle||'Untitled series')+'</div><div class="saved-meta">'+escapeHtml(p.projectType||'Video')+' · Updated '+escapeHtml(new Date(p.updatedAt||p.createdAt).toLocaleDateString())+'</div></div><div class="saved-actions"><button class="btn primary" data-open="'+escapeHtml(p.id)+'">Open</button><button class="btn" data-delete="'+escapeHtml(p.id)+'">Delete</button></div></div>').join('')}catch(e){root.innerHTML='<div class="empty">Could not load projects. '+escapeHtml(e.message||'Please try again.')+'</div>'}}
  async function saveBible(){const ok=await saveProject();$('bibleStatus').textContent=ok?(currentUser?'Series Bible saved to your account.':'Series Bible saved on this device.'):'Save failed. Check the status in Step 1 and try again.';return ok;}
  async function saveSeason(){const ok=await saveProject();$('seasonStatus').textContent=ok?(currentUser?'Season Plan saved to your account.':'Season Plan saved on this device.'):'Save failed. Return to Step 1 to review the save status and try again.';return ok;}
+ const episodeFieldIds=['episodeRuntime','episodeTitle','episodePurpose','episodeOpening','episodeTurn','episodeBeats','episodeCharacterBeat','episodeEnding','episodeContinuity','episodeVisuals'];
+ let episodeBlueprints={};
+ function loadEpisodeMap(){try{const v=JSON.parse($('episodeBlueprints').value||'{}');return v&&typeof v==='object'?v:{}}catch(e){return {}}}
+ function episodeKey(){return String($('blueprintEpisode').value||'1')}
+ function storeEpisode(){episodeBlueprints[episodeKey()]={};episodeFieldIds.forEach(id=>episodeBlueprints[episodeKey()][id]=$(id).value);$('episodeBlueprints').value=JSON.stringify(episodeBlueprints)}
+ function loadEpisode(){const d=episodeBlueprints[episodeKey()]||{};episodeFieldIds.forEach(id=>$(id).value=d[id]||(id==='episodeRuntime'?'3–5 minutes':''));$('episodeStatus').textContent='Episode '+episodeKey()+' of '+($('episodeCount').value||8)+' · blueprint draft'}
+ function refreshEpisodeOptions(){const s=$('blueprintEpisode'),count=Math.max(1,Math.min(12,Number($('episodeCount').value)||8)),current=Math.min(Number(s.value)||1,count);s.innerHTML=Array.from({length:count},(_,i)=>'<option value="'+(i+1)+'">Episode '+String(i+1).padStart(2,'0')+'</option>').join('');s.value=String(current);loadEpisode()}
  $('backToFoundation').addEventListener('click',()=>show('workshopView'));
  $('saveBibleButton').addEventListener('click',saveBible);
  $('continueSeasonButton').addEventListener('click',async()=>{const ok=await saveBible();$('seasonStatus').textContent=ok?'Series Bible saved. Continue shaping your season plan.':'Season Plan opened, but the project may not have saved. Check the save status.';show('seasonView')});
  $('backToBible').addEventListener('click',()=>show('bibleView'));
  $('saveSeasonButton').addEventListener('click',saveSeason);
+ $('continueEpisodeButton').addEventListener('click',async()=>{const ok=await saveSeason();if(!ok)return;episodeBlueprints=loadEpisodeMap();refreshEpisodeOptions();show('episodeView')});
+ $('backToSeason').addEventListener('click',()=>{storeEpisode();show('seasonView')});
+ $('backToFoundationFromEpisode').addEventListener('click',async()=>{storeEpisode();await saveProject();show('workshopView')});
+ $('blueprintEpisode').addEventListener('change',()=>{storeEpisode();loadEpisode()});
+ $('episodeCount').addEventListener('change',()=>{storeEpisode();refreshEpisodeOptions()});
+ episodeFieldIds.forEach(id=>$(id).addEventListener('input',storeEpisode));
+ $('saveEpisodeButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();$('episodeStatus').textContent=ok?'Episode '+episodeKey()+' blueprint saved.':'Save failed. Check the save status in Step 1.'});
+ $('nextEpisodeButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();if(!ok)return;const current=Number(episodeKey())||1,count=Number($('episodeCount').value)||8,next=Math.min(count,current+1);$('blueprintEpisode').value=String(next);loadEpisode();$('episodeStatus').textContent=next===current?'Last planned episode selected. Review it or return to an earlier episode.':'Saved. Now working on Episode '+next+'.'});
+ $('finishBlueprintButton').addEventListener('click',async()=>{storeEpisode();const ok=await saveProject();if(ok){await renderProjects();show('projectsView')}});
+ episodeBlueprints=loadEpisodeMap();refreshEpisodeOptions();
  $('backToFoundationFromSeason').addEventListener('click',()=>show('workshopView'));
  $('continueBibleButton').addEventListener('click',async()=>{await saveProject();$('bibleStatus').textContent='Review and expand the details below. Save when ready.';show('bibleView')});
  function showAuth(){authMode='signin';$('authHeading').textContent='Your stories, wherever you are.';$('authSubmit').textContent='Sign in';$('authModeButton').textContent='Create account';$('authNotice').textContent='Use the same email and password on every device.';show('authView')}
