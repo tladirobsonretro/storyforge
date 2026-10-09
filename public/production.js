@@ -25,12 +25,12 @@
     const n = $("prodEpisode").value || "1", e = map[n] || {};
     return {number:n,title:e.episodeTitle||("Episode "+n),purpose:e.episodePurpose||"",opening:e.episodeOpening||"",turn:e.episodeTurn||"",beats:e.episodeBeats||"",ending:e.episodeEnding||"",character:e.episodeCharacterBeat||"",visuals:e.episodeVisuals||"",continuity:e.episodeContinuity||""};
   }
-  const world = () => [$("bibleWorld")?.value,$("setting")?.value,$("worldRules")?.value,$("bibleRules")?.value,$("bibleLocations")?.value].filter(Boolean).join("\\n");
-  const chars = () => [$("protagonist")?.value,$("antagonist")?.value,$("relationships")?.value,$("bibleCharacterLook")?.value,$("bibleCharacterVoice")?.value].filter(Boolean).join("\\n");
+  const world = () => [$("bibleWorld")?.value,$("setting")?.value,$("worldRules")?.value,$("bibleRules")?.value,$("bibleLocations")?.value].filter(Boolean).join("\n");
+  const chars = () => [$("protagonist")?.value,$("antagonist")?.value,$("relationships")?.value,$("bibleCharacterLook")?.value,$("bibleCharacterVoice")?.value].filter(Boolean).join("\n");
   async function post(url,body) { const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw new Error(d.error||("Request failed ("+r.status+")"));return d; }
   function stage(n,state) { const el=$("prodStage"+n);if(el){el.style.borderColor=state==="done"?"#aaa":state==="active"?"#777":"#292929";} }
   function progress(p,msg) {$("prodBar").style.width=Math.round(p*100)+"%";$("prodProgress").textContent=msg;$("prodStatus").textContent=msg;}
-  function sceneList(ep,count) { const raw=(ep.beats||"").split(/\\n+/).map(x=>x.replace(/^\\s*(?:\\d+[.)-]|[-•])\\s*/,"").trim()).filter(Boolean);const arr=[ep.opening,...raw,ep.turn,ep.ending].filter(Boolean);while(arr.length<count)arr.push(ep.purpose||"A new discovery complicates the hero's goal.");return arr.slice(0,count); }
+  function sceneList(ep,count) { const raw=(ep.beats||"").split(/\n+/).map(x=>x.replace(/^\s*(?:\d+[.)-]|[-•])\s*/,"").trim()).filter(Boolean);const arr=[ep.opening,...raw,ep.turn,ep.ending].filter(Boolean);while(arr.length<count)arr.push(ep.purpose||"A new discovery complicates the hero's goal.");return arr.slice(0,count); }
   function promptFor(s,ep,i) { return 'Stylized animated scene '+(i+1)+' for "'+($("seriesTitle").value||"Untitled series")+'", episode '+ep.number+': '+ep.title+'. Scene: '+(s.action||s.premise||s.title)+'. World: '+world()+'. Characters: '+chars()+'. Visual direction: '+(ep.visuals||$("bibleVisualStyle")?.value||$("tone")?.value||"cinematic stylized animation")+'. Continuity: '+(ep.continuity||$("bibleContinuity")?.value||"Keep faces, clothing, props and locations consistent.")+'. Vertical 9:16, no photorealism, no live action, no logos or text.'; }
   function renderScenes() {
     const root=$("prodScenes");if(!scenes.length){root.innerHTML='<div class="empty">No scene breakdown yet.</div>';return;}
