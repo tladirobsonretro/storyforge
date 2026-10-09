@@ -217,6 +217,7 @@
     }, true);
   }
   function init() {
+    repairProjectsNavigation();
     addUi();
     if (!$("productionView")) return;
     $("productionData")?.remove();
