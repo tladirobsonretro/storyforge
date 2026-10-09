@@ -204,6 +204,18 @@
       busy = false; $("sfProduce").disabled = false; $("sfRetry").disabled = false;
     }
   }
+  function repairProjectsNavigation() {
+    const main = document.querySelector("main");
+    if (main) Array.from(main.childNodes).forEach(node => {
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() === "\\n") node.remove();
+    });
+    document.addEventListener("click", event => {
+      const button = event.target.closest("#projectsButton");
+      if (!button) return;
+      const ids = ["homeView","workshopView","bibleView","seasonView","episodeView","productionView","exportView","projectsView","authView"];
+      ids.forEach(id => { const node = document.getElementById(id); if (node) node.classList.toggle("hidden", id !== "projectsView"); });
+    }, true);
+  }
   function init() {
     addUi();
     if (!$("productionView")) return;
