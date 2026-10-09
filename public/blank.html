@@ -202,7 +202,7 @@ Continue for each planned episode. You can write rough notes first."></textarea>
     </div>
   </section>
 
-  <section id="episodeView" class="hidden">
+  <section id="episodeView" class="hidden"><input id="episodeBlueprints" class="hidden" value="">
     <div class="workshop-head"><div><div class="eyebrow">Story Workshop · Step 4</div><h1>Build an episode blueprint</h1><p class="subheading" style="text-align:left">Turn the season map into a detailed plan for each episode. This is the story blueprint, not the final script or video yet.</p><div class="status" id="episodeStatus" aria-live="polite">Episode blueprint · draft</div></div><button class="btn" id="backToSeason" type="button">← Step 3: Season Plan</button></div>
     <div class="panel">
       <div class="section-title">Choose an episode</div><p class="section-copy">Complete one episode at a time. Each episode has its own saved blueprint.</p>
@@ -256,11 +256,11 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  async function saveBible(){const ok=await saveProject();$('bibleStatus').textContent=ok?(currentUser?'Series Bible saved to your account.':'Series Bible saved on this device.'):'Save failed. Check the status in Step 1 and try again.';return ok;}
  async function saveSeason(){const ok=await saveProject();$('seasonStatus').textContent=ok?(currentUser?'Season Plan saved to your account.':'Season Plan saved on this device.'):'Save failed. Return to Step 1 to review the save status and try again.';return ok;}
  const episodeFieldIds=['episodeRuntime','episodeTitle','episodePurpose','episodeOpening','episodeTurn','episodeBeats','episodeCharacterBeat','episodeEnding','episodeContinuity','episodeVisuals'];
- let episodeBlueprints={};
+ let episodeBlueprints={},displayedEpisode='1';
  function loadEpisodeMap(){try{const v=JSON.parse($('episodeBlueprints').value||'{}');return v&&typeof v==='object'?v:{}}catch(e){return {}}}
  function episodeKey(){return String($('blueprintEpisode').value||'1')}
- function storeEpisode(){episodeBlueprints[episodeKey()]={};episodeFieldIds.forEach(id=>episodeBlueprints[episodeKey()][id]=$(id).value);$('episodeBlueprints').value=JSON.stringify(episodeBlueprints)}
- function loadEpisode(){const d=episodeBlueprints[episodeKey()]||{};episodeFieldIds.forEach(id=>$(id).value=d[id]||(id==='episodeRuntime'?'3–5 minutes':''));$('episodeStatus').textContent='Episode '+episodeKey()+' of '+($('episodeCount').value||8)+' · blueprint draft'}
+ function storeEpisode(){episodeBlueprints[displayedEpisode]={};episodeFieldIds.forEach(id=>episodeBlueprints[displayedEpisode][id]=$(id).value);$('episodeBlueprints').value=JSON.stringify(episodeBlueprints)}
+ function loadEpisode(){displayedEpisode=episodeKey();const d=episodeBlueprints[displayedEpisode]||{};episodeFieldIds.forEach(id=>$(id).value=d[id]||(id==='episodeRuntime'?'3–5 minutes':''));$('episodeStatus').textContent='Episode '+displayedEpisode+' of '+($('episodeCount').value||8)+' · blueprint draft'}
  function refreshEpisodeOptions(){const s=$('blueprintEpisode'),count=Math.max(1,Math.min(12,Number($('episodeCount').value)||8)),current=Math.min(Number(s.value)||1,count);s.innerHTML=Array.from({length:count},(_,i)=>'<option value="'+(i+1)+'">Episode '+String(i+1).padStart(2,'0')+'</option>').join('');s.value=String(current);loadEpisode()}
  $('backToFoundation').addEventListener('click',()=>show('workshopView'));
  $('saveBibleButton').addEventListener('click',saveBible);
