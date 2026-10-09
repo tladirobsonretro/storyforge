@@ -99,11 +99,11 @@
       }
 
       window.storyforgeWorldBible = data.world || "";
-      window.storyforgeCharacterBible = (data.characters || []).map((c) => [c.name, c.role].join(" | ")).join(" ; ");
+      window.storyforgeCharacterBible = "";
       if (window.storyforgePipeline && window.storyforgePipeline.write) {
         window.storyforgePipeline.write({title:data.title||"Untitled story",idea:idea,logline:data.logline||"",world:data.world||"",characters:data.characters||[],episodes:data.episodes||[],scenes:data.scenes||[]});
       }
-      try { localStorage.setItem("storyforge-story-bible", JSON.stringify({world:{name:data.title||"Story world",premise:data.world||"",visualIdentity:"Original project world"},characters:data.characters||[]})); } catch (_) {}
+      try { localStorage.setItem("storyforge-story-bible", JSON.stringify({world:null,characters:[]})); } catch (_) {}
       if (typeof window.saveProject === "function") window.saveProject();
       notify(data.generationWarning || "Project created and saved.");
       results?.scrollIntoView({ behavior: "smooth", block: "start" });
