@@ -76,5 +76,26 @@
     document.addEventListener("click",event=>{if(event.target.closest("#saveProjectButton"))saveStoryFromPage();});
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initialise);else initialise();
+  window.generateVideo = async function () {
+    const p=read();
+    let production={};try{production=JSON.parse(localStorage.getItem("storyforge-production-state")||"{}")}catch(_){}
+    const world=window.storyforgeWorldBible||p.world||production.world||"";
+    const chars=window.storyforgeCharacterBible||charactersText()||production.characters||"";
+    const shots=Array.isArray(production.shots)?production.shots:(p.storyboard&&p.storyboard.shots)||[];
+    const scene=p.scene||production.scene||window.storyforgeScene||{};
+    const title=val("videoTitle")||p.title||"Story scene";
+    const sequence=shots.map((shot,i)=>"SHOT "+(i+1)+": "+[shot.action,shot.camera,shot.audio,shot.visualPrompt].filter(Boolean).join(" | ")).join("\\n");
+    const prompt=[p.visualStyle||STYLE,"STORY: "+title,"WORLD BIBLE: "+(typeof world==="string"?world:JSON.stringify(world)),"CHARACTER BIBLE: "+(typeof chars==="string"?chars:JSON.stringify(chars)),"SCENE: "+JSON.stringify(scene),"STORYBOARD IN ORDER:\\n"+(sequence||"No storyboard shots saved yet."),"Follow the supplied shot order and story action. Preserve character identity, wardrobe, accessories, location geography, colour palette and lighting continuity. Strictly painterly stylized animation. Never photorealistic, hyperrealistic, photographic or live-action."].join("\\n\\n");
+    const button=byId("videoGenerateButton");if(!button)return;
+    button.disabled=true;button.textContent="Generating context-aware clip…";
+    try{
+      const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:"alibaba/wan-2.2-fast",duration:4,referenceImages:window.storyforgeCharacterReferenceImage?[window.storyforgeCharacterReferenceImage]:[]})});
+      const data=await response.json();if(!response.ok)throw new Error(data.error||"Video generation failed.");
+      const output=byId("toolOutput");output.style.display="block";
+      output.innerHTML+="<h4 style='margin-top:18px'>Generated context-aware clip</h4><video controls playsinline src='"+data.url+"' style='width:100%;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#888;font-size:11px'>Generated using the saved world, characters, scene and storyboard context.</p>";
+      if(typeof window.toast==="function")window.toast("Context-aware clip generated.");
+    }catch(error){if(typeof window.toast==="function")window.toast(error.message);}
+    finally{button.disabled=false;button.textContent="Generate test clip →";}
+  };
   window.storyforgePipeline = { read, write, syncContext, visualStyle:STYLE, charactersText, worldText };
 })();
