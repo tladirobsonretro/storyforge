@@ -88,6 +88,45 @@
   const world = () => [$("bibleWorld")?.value, $("setting")?.value, $("worldRules")?.value, $("bibleRules")?.value, $("bibleLocations")?.value].filter(Boolean).join("\n");
   const chars = () => [$("protagonist")?.value, $("antagonist")?.value, $("relationships")?.value, $("bibleCharacterLook")?.value, $("bibleCharacterVoice")?.value].filter(Boolean).join("\n");
   const style = ep => ep.visuals || $("bibleVisualStyle")?.value || $("tone")?.value || "original stylized animation";
+  function breakdownStorageKey() {
+    let projectId = "";
+    try { projectId = localStorage.getItem("storyforge-workshop-active-v1") || ""; } catch (_) {}
+    return "storyforge:scene-breakdown:v1:" + (projectId || "current-project");
+  }
+  function saveBreakdown() {
+    if (!scenes.length) return;
+    try {
+      localStorage.setItem(breakdownStorageKey(), JSON.stringify({
+        scenes,
+        episode: dataForEpisode(),
+        savedAt: new Date().toISOString()
+      }));
+    } catch (error) {
+      console.warn("StoryForge could not save the scene breakdown:", error);
+      $("sfStatus").textContent = "Scene breakdown is ready, but browser storage failed. Please save space and try again.";
+    }
+  }
+  function restoreBreakdown() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(breakdownStorageKey()) || "null");
+      if (!saved || !Array.isArray(saved.scenes) || !saved.scenes.length) return false;
+      scenes = saved.scenes;
+      breakdownReady = true;
+      $("sfEpisodeTitle").textContent = saved.episode?.title || "Episode 01";
+      $("sfBreakdownTitle").textContent = "Episode 01 · " + (saved.episode?.title || "Scene breakdown");
+      $("sfDoneText").textContent = "Restored your saved scene breakdown (" + scenes.length + " scenes).";
+      $("sfDonePanel").classList.remove("hidden");
+      $("sfCreate").textContent = "Recreate scene breakdown";
+      renderBreakdown();
+      $("sfBreakdownPanel").classList.remove("hidden");
+      $("sfStatus").textContent = "Restored your previous scene breakdown. You can review it or produce the video.";
+      return true;
+    } catch (error) {
+      console.warn("StoryForge could not restore the scene breakdown:", error);
+      return false;
+    }
+  }
+
   async function post(url, body) {
     const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     let d = {};
@@ -149,6 +188,7 @@
         $("sfWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc("Building scene " + (i + 1) + " of " + premises.length + "…");
       }
       breakdownReady = true;
+      saveBreakdown();
       $("sfBreakdownTitle").textContent = "Episode 01 · " + ep.title;
       $("sfDoneText").textContent = "Done. " + scenes.length + " scenes prepared for Episode 1. No video has been generated yet.";
       $("sfDonePanel").classList.remove("hidden");
@@ -177,6 +217,7 @@
       const clips = [];
       for (let i = 0; i < scenes.length; i++) {
         scenes[i].videoPrompt = $("sfPrompt" + i)?.value || scenes[i].videoPrompt;
+        saveBreakdown();
         $("sfVideoWorkingText").innerHTML = '<span class="sf-spinner"></span>' + esc("Sending scene " + (i + 1) + " of " + scenes.length + " to the video model. This can take several minutes…");
         const clip = await post("/api/video", { prompt: scenes[i].videoPrompt, model: "alibaba/wan-2.2-fast", duration: CLIP_DURATIONS[i] || 7, aspectRatio: "9:16", audio: true });
         if (!clip.url) throw new Error("The video provider returned no clip for scene " + (i + 1) + ".");
@@ -238,6 +279,13 @@
       $("sfBreakdownPanel").scrollIntoView({ behavior: "smooth", block: "start" });
     });
     $("sfProduce").addEventListener("click", produceVideo);
+    $("sfSceneList").addEventListener("input", event => {
+      const match = event.target.id.match(/^sfPrompt(\\d+)$/);
+      if (!match) return;
+      const index = Number(match[1]);
+      if (scenes[index]) { scenes[index].videoPrompt = event.target.value; saveBreakdown(); }
+    });
+    restoreBreakdown();
     $("sfVideoRetry").addEventListener("click", produceVideo);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
