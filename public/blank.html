@@ -241,7 +241,7 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  let selectedType='Video',activeId=null,currentUser=null,authMode='signin',authBusy=false;
  function readProjects(){try{const p=JSON.parse(localStorage.getItem(keys.projects)||'[]');return Array.isArray(p)?p:[]}catch(e){return []}}
  function writeProjects(p){localStorage.setItem(keys.projects,JSON.stringify(p))}
- function show(view){['homeView','workshopView','bibleView','seasonView','episodeView','productionView','exportView','projectsView','authView'].forEach(id=>$(id).classList.toggle('hidden',id!==view));window.scrollTo({top:0,behavior:'instant'})}
+ function show(view){['homeView','workshopView','bibleView','seasonView','episodeView','productionView','exportView','projectsView','authView'].forEach(id=>{const node=$(id);if(node)node.classList.toggle('hidden',id!==view)});try{localStorage.setItem('storyforge:lastView',view)}catch(e){}window.scrollTo({top:0,behavior:'instant'})}
  function updateCreate(){$('createButton').disabled=!$('idea').value.trim()}
  function setAccountUI(){$('authButton').classList.toggle('hidden',!!currentUser);$('signOutButton').classList.toggle('hidden',!currentUser);$('projectsFootnote').textContent=currentUser?'Signed in as '+currentUser.email+'. Projects are stored in your cloud workspace.':'Sign in to sync projects across devices. Existing local projects can be imported.';$('storageFootnote').textContent=currentUser?'Cloud sync is on for '+currentUser.email+'. Save changes to access them on other devices.':'Sign in to sync your series foundation across devices. This step does not call an AI, image or video generation service.'}
  function newProject(){activeId=null;fields.forEach(id=>{if(id==='format')$(id).value='Animated series';else $(id).value=''});if($('productionData'))$('productionData').value='{}';if($('productionSettings'))$('productionSettings').value='{}';episodeBlueprints={};if($('episodeBlueprints'))$('episodeBlueprints').value='{}';$('premise').value=$('idea').value.trim();const raw=$('idea').value.trim().replace(/\s+/g,' ');$('seriesTitle').value=raw?(raw.length>52?raw.slice(0,49).replace(/\s+\S*$/,'')+'…':raw):'';$('saveStatus').textContent='Not saved yet';$('workshopHeading').textContent='Your series foundation';show('workshopView')}
@@ -295,6 +295,19 @@ Continue for each planned episode. You can write rough notes first."></textarea>
  fields.forEach(id=>$(id).addEventListener('input',()=>{if(activeId)$('saveStatus').textContent='Unsaved changes · save to keep your edits'}));
  if(db){db.auth.onAuthStateChange((event,session)=>{currentUser=session?.user||null;setAccountUI();if(event==='SIGNED_IN'&&currentUser){importLocalProjects().then(renderProjects).catch(e=>{$('authNotice').textContent='Signed in, but project import failed: '+(e.message||'Please try again.')})}});db.auth.getSession().then(async({data,error})=>{if(error)throw error;currentUser=data.session?.user||null;setAccountUI();if(currentUser){try{await importLocalProjects()}catch(e){console.warn('StoryForge import:',e.message)}}}).catch(e=>console.warn('StoryForge auth:',e.message))}else{$('authNotice').textContent='Account service did not load. Refresh and try again.'}
  setAccountUI();updateCreate();
+ window.addEventListener('load',async()=>{
+   let lastView='homeView',activeProject='';
+   try{lastView=localStorage.getItem('storyforge:lastView')||'homeView';activeProject=localStorage.getItem(keys.active)||''}catch(e){}
+   const validViews=['homeView','workshopView','bibleView','seasonView','episodeView','productionView','exportView','projectsView','authView'];
+   if(!validViews.includes(lastView)||!$(lastView))lastView='homeView';
+   if(activeProject&&lastView!=='homeView'&&lastView!=='projectsView'&&lastView!=='authView'){
+     await openProject(activeProject);
+     if($(lastView))show(lastView);
+   }else{
+     if(lastView==='projectsView')await renderProjects();
+     show(lastView);
+   }
+ });
 })();
 </script>
 <script src="/production.js"></script>
