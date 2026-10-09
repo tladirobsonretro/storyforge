@@ -409,6 +409,31 @@ app.get("/", (req, res) => {
 <div class="section-head"><h3>Your projects</h3><span id="projectCount">Saved locally in this browser</span></div><section id="projects" class="projects"></section>
 </main></div><div class="toast" id="toast"></div>
 <script>
+/* Explicit element bindings: never rely on browser-created globals for element IDs. */
+const worldName = document.getElementById("worldName");
+const worldTone = document.getElementById("worldTone");
+const worldPremise = document.getElementById("worldPremise");
+const worldSetting = document.getElementById("worldSetting");
+const charName = document.getElementById("charName");
+const charRole = document.getElementById("charRole");
+const charPersonality = document.getElementById("charPersonality");
+const charAppearance = document.getElementById("charAppearance");
+const charGoal = document.getElementById("charGoal");
+const boardTitle = document.getElementById("boardTitle");
+const boardEpisode = document.getElementById("boardEpisode");
+const boardEpisodeTitle = document.getElementById("boardEpisodeTitle");
+const boardPremise = document.getElementById("boardPremise");
+const videoTitle = document.getElementById("videoTitle");
+const videoFormat = document.getElementById("videoFormat");
+const videoShots = document.getElementById("videoShots");
+const videoDuration = document.getElementById("videoDuration");
+const videoCaptions = document.getElementById("videoCaptions");
+const assetType = document.getElementById("assetType");
+const assetStyle = document.getElementById("assetStyle");
+const assetSubject = document.getElementById("assetSubject");
+const assetMood = document.getElementById("assetMood");
+const assetNotes = document.getElementById("assetNotes");
+const toolOutput = document.getElementById("toolOutput");
 let currentStory=null;
 function showSavedStories(){
  const panel=document.getElementById("toolPanel");
@@ -563,6 +588,43 @@ async function createStory(){
   toast("Story forged successfully.");
  }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Create story →"}
 }
+
+// Make primary tool actions reliable and surface failures instead of silently doing nothing.
+Object.assign(window, {
+ showTool, showSavedStories, buildWorld, buildCharacter, generateCharacterReference,
+ generateScene, buildStoryboard, buildVideoPlan, generateVideo, buildAsset, generateImage,
+ focusPrompt, toast, createStory, saveProject
+});
+document.addEventListener("click", function(event) {
+ const button = event.target && event.target.closest ? event.target.closest("button[onclick]") : null;
+ if (!button) return;
+ const source = button.getAttribute("onclick") || "";
+ const match = source.match(/^\\s*([A-Za-z_$][\\w$]*)\\s*\\(([^)]*)\\)\\s*;?\\s*$/);
+ if (!match) return;
+ const name = match[1], args = match[2].trim();
+ const noArgActions = new Set(["showSavedStories","buildWorld","buildCharacter","generateCharacterReference","generateScene","buildStoryboard","buildVideoPlan","generateVideo","buildAsset","generateImage","focusPrompt","createStory","saveProject"]);
+ if (name !== "showTool" && !(noArgActions.has(name) && !args)) return;
+ event.preventDefault();
+ event.stopImmediatePropagation();
+ try {
+  let result;
+  if (name === "showTool") {
+   const tool = args.match(/^['"]([^'"]+)['"]$/);
+   if (!tool) throw new Error("Unknown tool selection.");
+   result = window.showTool(tool[1]);
+  } else {
+   if (typeof window[name] !== "function") throw new Error("Tool did not load: " + name);
+   result = window[name]();
+  }
+  Promise.resolve(result).catch(function(error) {
+   console.error("StoryForge action failed:", error);
+   toast("Action failed: " + (error && error.message ? error.message : "Please try again."));
+  });
+ } catch (error) {
+  console.error("StoryForge action failed:", error);
+  toast("Action failed: " + (error && error.message ? error.message : "Please try again."));
+ }
+}, true);
 migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary();
 </script><script src="/story-create.js?v=2"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js"></script></body></html>`);
 });
