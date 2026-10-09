@@ -2,11 +2,15 @@ const express = require("express");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
 const { execFile } = require("child_process");
 const ffmpegPath = require("ffmpeg-static");
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+const videoReferenceDir = path.join(os.tmpdir(), "storyforge-video-references");
+const videoReferenceFiles = new Map();
+fs.mkdirSync(videoReferenceDir, { recursive: true });
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static("public"));
@@ -282,17 +286,47 @@ app.post("/api/video-plan", (req, res) => {
   res.json(buildVideoPlan(req.body));
 });
 
+app.post("/api/video-reference", (req, res) => {
+  const dataUrl = String(req.body?.dataUrl || "");
+  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return res.status(400).json({ error: "Choose a PNG, JPG or WebP image." });
+  const bytes = Buffer.from(match[2], "base64");
+  if (!bytes.length || bytes.length > 8 * 1024 * 1024) return res.status(413).json({ error: "Reference images must be smaller than 8 MB." });
+  const id = crypto.randomUUID();
+  const ext = match[1] === "image/png" ? "png" : match[1] === "image/webp" ? "webp" : "jpg";
+  const diskPath = path.join(videoReferenceDir, id + "." + ext);
+  fs.writeFileSync(diskPath, bytes);
+  videoReferenceFiles.set(id, { path: diskPath, type: match[1], expiresAt: Date.now() + 60 * 60 * 1000 });
+  const base = String(process.env.RENDER_EXTERNAL_URL || (req.protocol + "://" + req.get("host"))).replace(/\/$/, "");
+  res.json({ url: base + "/api/video-reference/" + id, expiresInMinutes: 60 });
+});
+
+app.get("/api/video-reference/:id", (req, res) => {
+  const item = videoReferenceFiles.get(req.params.id);
+  if (!item || item.expiresAt < Date.now() || !fs.existsSync(item.path)) {
+    videoReferenceFiles.delete(req.params.id);
+    return res.status(404).send("Reference image expired. Upload it again.");
+  }
+  res.setHeader("Content-Type", item.type);
+  res.setHeader("Cache-Control", "public, max-age=300");
+  res.sendFile(item.path);
+});
+
 app.post("/api/video", async (req, res) => {
   if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({ error: "Video generation is not connected yet. Add POLLINATIONS_API_KEY in Render to enable it." });
   const prompt = String(req.body?.prompt || "").trim();
-  const model = String(req.body?.model || "wan").trim();
-  const duration = Math.max(2, Math.min(10, Number(req.body?.duration || 4)));
+  const model = String(req.body?.model || "alibaba/wan-2.2-fast").trim();
+  const duration = Math.max(2, Math.min(15, Number(req.body?.duration || 5)));
+  const aspectRatio = String(req.body?.aspectRatio || "16:9");
   if (!prompt) return res.status(400).json({ error: "A video prompt is required." });
+  if (!["16:9","9:16","1:1","4:3","3:4"].includes(aspectRatio)) return res.status(400).json({ error: "Choose a supported aspect ratio." });
   try {
-    const params = new URLSearchParams({ model, duration: String(duration) });
+    const params = new URLSearchParams({ model, duration: String(duration), aspectRatio });
     if (req.body?.image) params.append("image", String(req.body.image));
+    if (req.body?.seed !== undefined && req.body?.seed !== null && String(req.body.seed).trim() !== "") params.append("seed", String(Math.max(0, Math.min(2147483647, Number(req.body.seed) || 0))));
+    if (req.body?.audio !== undefined) params.append("audio", req.body.audio ? "true" : "false");
     if (Array.isArray(req.body?.referenceImages)) {
-      req.body.referenceImages.slice(0, 3).forEach((url) => params.append("reference_images", String(url)));
+      req.body.referenceImages.slice(0, 3).filter(url => /^https:\/\//i.test(String(url))).forEach((url) => params.append("reference_images", String(url)));
     }
     const endpoint = "https://gen.pollinations.ai/video/" + encodeURIComponent(prompt) + "?" + params.toString();
     const response = await fetch(endpoint, {
@@ -313,7 +347,7 @@ app.post("/api/video", async (req, res) => {
     const video = Buffer.from(await response.arrayBuffer());
     if (video.length < 1000) return res.status(502).json({ error: "The video provider returned an empty or incomplete video. Please try again." });
     if (video.length > 20 * 1024 * 1024) return res.status(502).json({ error: "The generated clip exceeds the 20 MB preview limit. Try a shorter clip." });
-    res.json({ url: "data:video/mp4;base64," + video.toString("base64"), model, duration, bytes: video.length });
+    res.json({ url: "data:video/mp4;base64," + video.toString("base64"), model, duration, aspectRatio, bytes: video.length });
   } catch (error) {
     console.error("StoryForge video generation failed:", error);
     res.status(502).json({ error: "Video generation could not finish. Please try again. " + (error.message || "") });
@@ -322,25 +356,37 @@ app.post("/api/video", async (req, res) => {
 
 app.post("/api/assemble", async (req, res) => {
   const clips = Array.isArray(req.body?.clips) ? req.body.clips.filter(Boolean) : [];
-  if (clips.length < 2) return res.status(400).json({ error: "At least two animated shot clips are required." });
+  if (clips.length < 2) return res.status(400).json({ error: "Add at least two generated clips to the timeline before assembling." });
+  if (clips.length > 12) return res.status(400).json({ error: "A timeline can contain up to 12 clips per export." });
+  const aspectRatio = String(req.body?.aspectRatio || "9:16");
+  const dimensions = { "9:16":[1080,1920], "16:9":[1920,1080], "1:1":[1080,1080], "4:3":[1440,1080], "3:4":[1080,1440] }[aspectRatio] || [1080,1920];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "storyforge-"));
   try {
     const files = [];
     for (let i = 0; i < clips.length; i++) {
-      const url = new URL(clips[i]);
-      if (!/^https?:$/.test(url.protocol)) throw new Error("Invalid clip URL.");
+      const value = String(clips[i]);
       const file = path.join(dir, String(i + 1).padStart(3, "0") + ".mp4");
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Could not download shot " + (i + 1) + ".");
-      fs.writeFileSync(file, Buffer.from(await response.arrayBuffer()));
+      const dataMatch = value.match(/^data:video\/mp4;base64,([A-Za-z0-9+/=]+)$/);
+      if (dataMatch) {
+        const bytes = Buffer.from(dataMatch[1], "base64");
+        if (bytes.length < 1000 || bytes.length > 20 * 1024 * 1024) throw new Error("Shot " + (i + 1) + " is empty or exceeds the 20 MB clip limit.");
+        fs.writeFileSync(file, bytes);
+      } else {
+        const url = new URL(value);
+        if (!/^https?:$/.test(url.protocol)) throw new Error("Invalid clip URL for shot " + (i + 1) + ".");
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Could not download shot " + (i + 1) + ".");
+        fs.writeFileSync(file, Buffer.from(await response.arrayBuffer()));
+      }
       files.push(file);
     }
     const normalized = [];
     for (let i = 0; i < files.length; i++) {
       const normalizedFile = path.join(dir, "normalized-" + String(i + 1).padStart(3, "0") + ".mp4");
+      const [width,height] = dimensions;
       await new Promise((resolve, reject) => execFile(ffmpegPath, [
         "-y","-i",files[i],
-        "-vf","scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
+        "-vf","scale=" + width + ":" + height + ":force_original_aspect_ratio=decrease,pad=" + width + ":" + height + ":(ow-iw)/2:(oh-ih)/2,format=yuv420p",
         "-r","30","-c:v","libx264","-preset","veryfast","-crf","23",
         "-c:a","aac","-ar","48000","-ac","2","-b:a","128k","-movflags","+faststart",normalizedFile
       ], {timeout:180000}, (error) => error ? reject(error) : resolve()));
@@ -353,6 +399,7 @@ app.post("/api/assemble", async (req, res) => {
       "-y","-f","concat","-safe","0","-i",list,"-c","copy","-movflags","+faststart",output
     ], {timeout:180000}, (error) => error ? reject(error) : resolve()));
     res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Disposition", 'attachment; filename="storyforge-final.mp4"');
     res.sendFile(output, () => fs.rmSync(dir, { recursive: true, force: true }));
   } catch (error) {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -525,15 +572,24 @@ app.get("/", (req, res) => {
     </div>
     <button class="generate tool-action" onclick="buildStoryboard()">Forge storyboard →</button>
   </div>
-  <div id="sceneForm" style="display:none"><div class="result-grid"><div class="result-box"><h4>Scene premise</h4><textarea id="scenePremise" class="tool-input" rows="4" placeholder="The heroes discover a strange signal beneath the old lighthouse."></textarea></div><div class="result-box"><h4>World context</h4><textarea id="sceneWorld" class="tool-input" rows="4" placeholder="World details"></textarea></div><div class="result-box" style="grid-column:1/-1"><h4>Characters</h4><textarea id="sceneCharacters" class="tool-input" rows="3" placeholder="Character names, roles and personalities"></textarea></div></div><button class="generate tool-action" onclick="generateScene()">Generate full scene →</button></div><div id="videoForm" style="display:none">
+  <div id="sceneForm" style="display:none"><div class="result-grid"><div class="result-box"><h4>Scene premise</h4><textarea id="scenePremise" class="tool-input" rows="4" placeholder="The heroes discover a strange signal beneath the old lighthouse."></textarea></div><div class="result-box"><h4>World context</h4><textarea id="sceneWorld" class="tool-input" rows="4" placeholder="World details"></textarea></div><div class="result-box" style="grid-column:1/-1"><h4>Characters</h4><textarea id="sceneCharacters" class="tool-input" rows="3" placeholder="Character names, roles and personalities"></textarea></div></div><button class="generate tool-action" onclick="generateScene()">Generate full scene →</button></div>
+  <div id="videoForm" style="display:none">
+    <div class="studio-intro">Direct one shot at a time, use your storyboard or a reference image, then add finished clips to the timeline and export an MP4. Video generation requires a connected provider key.</div>
     <div class="result-grid">
-      <div class="result-box"><h4>Video title</h4><input id="videoTitle" class="tool-input" placeholder="The Island That Appears Once a Century"></div>
-      <div class="result-box"><h4>Format</h4><select id="videoFormat" class="tool-input"><option>YouTube Short</option><option>TikTok / Reels</option><option>Landscape episode</option></select></div>
-      <div class="result-box"><h4>Storyboard shots</h4><input id="videoShots" class="tool-input" type="number" min="1" max="30" value="8"></div>
-      <div class="result-box"><h4>Total duration (seconds)</h4><input id="videoDuration" class="tool-input" type="number" min="1" max="60" value="29"></div>
-      <div class="result-box"><h4>Captions</h4><select id="videoCaptions" class="tool-input"><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div class="result-box"><h4>Project / video title</h4><input id="videoTitle" class="tool-input" value="THE QUEUE" placeholder="Your film or episode title"></div>
+      <div class="result-box"><h4>Starting point</h4><select id="videoInputMode" class="tool-input"><option value="text">Text to video</option><option value="image">Animate a reference image</option></select></div>
+      <div class="result-box"><h4>Video model</h4><select id="videoModel" class="tool-input"><option value="alibaba/wan-2.2-fast">Wan 2.2 Fast · recommended</option><option value="alibaba/wan-2.6">Wan 2.6</option><option value="bytedance/seedance-2.0-fast">Seedance 2.0 Fast</option><option value="bytedance/seedance-2.0">Seedance 2.0</option><option value="google/veo-3.1-fast">Veo 3.1 Fast</option><option value="x-ai/grok-imagine-video">Grok Imagine Video</option></select></div>
+      <div class="result-box"><h4>Clip duration</h4><select id="videoDuration" class="tool-input"><option value="4">4 seconds</option><option value="5" selected>5 seconds</option><option value="6">6 seconds</option><option value="8">8 seconds</option><option value="10">10 seconds</option><option value="12">12 seconds</option><option value="15">15 seconds</option></select></div>
+      <div class="result-box"><h4>Aspect ratio</h4><select id="videoAspectRatio" class="tool-input"><option value="16:9">Landscape · 16:9</option><option value="9:16">Portrait · 9:16</option><option value="1:1">Square · 1:1</option><option value="4:3">Classic · 4:3</option><option value="3:4">Portrait · 3:4</option></select></div>
+      <div class="result-box"><h4>Camera movement</h4><select id="videoCamera" class="tool-input"><option>Slow dolly in</option><option>Slow dolly out</option><option>Tracking shot</option><option>Crane up</option><option>Crane down</option><option>Orbit around subject</option><option>Static shot with subtle motion</option><option>Slow pan left</option><option>Slow pan right</option><option>Handheld documentary</option><option>FPV glide</option></select></div>
+      <div class="result-box"><h4>Visual style</h4><select id="videoVisualStyle" class="tool-input"><option value="painterly 2D animation">Painterly 2D animation</option><option value="stylized 2D anime animation">Stylized 2D anime</option><option value="stop-motion clay animation">Stop-motion clay animation</option><option value="stylized 3D animation">Stylized 3D animation</option><option value="cinematic live-action">Cinematic live-action</option></select></div>
+      <div class="result-box"><h4>Lighting / mood</h4><select id="videoLighting" class="tool-input"><option>Atmospheric cinematic lighting</option><option>Warm golden-hour light</option><option>Cool moonlight and deep shadows</option><option>Neon night lighting</option><option>Soft overcast daylight</option><option>High-contrast noir lighting</option></select></div>
+      <div class="result-box"><h4>Reference image URL (optional)</h4><input id="videoImageUrl" class="tool-input" placeholder="https://.../reference.jpg"><input id="videoImageFile" class="tool-input" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Upload reference image"><div id="videoImageStatus" style="font-size:12px;color:#888;margin-top:7px">Upload a PNG, JPG or WebP image, up to 8 MB.</div></div>
+      <div class="result-box"><h4>Sound</h4><select id="videoAudio" class="tool-input"><option value="yes" selected>Generate audio when supported</option><option value="no">No generated audio</option></select></div>
+      <div class="result-box" style="grid-column:1/-1"><h4>Shot prompt</h4><textarea id="videoPrompt" class="tool-input" rows="5" placeholder="Describe what happens in this shot. The saved story, world, characters and selected storyboard shot will be added automatically."></textarea><div style="font-size:12px;color:#888;margin-top:7px">Tip: describe the action and emotion. Camera movement and visual direction are added from your settings.</div></div>
     </div>
-    <button class="generate tool-action" onclick="buildVideoPlan()">Prepare Video →</button><button id="videoGenerateButton" class="copy-btn" onclick="generateVideo()">Render Video →</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button id="videoGenerateButton" class="generate tool-action" onclick="generateVideo()">Generate video clip →</button><button class="copy-btn" onclick="buildVideoPlan()">Build shot plan</button><button id="videoAddClipButton" class="copy-btn" onclick="addVideoClipToTimeline()" disabled>Add latest clip to timeline</button></div>
+    <div class="result-box" style="margin-top:18px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h4 style="margin:0">Timeline</h4><span id="videoTimelineCount" style="color:#888;font-size:12px">0 clips</span></div><div id="videoTimeline" style="margin-top:12px;color:#888;font-size:13px">Generate a clip, then add it here. Add at least two clips to export a complete MP4.</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button id="videoAssembleButton" class="generate tool-action" onclick="assembleVideo()" disabled>Assemble & export MP4 →</button><button class="copy-btn" onclick="clearVideoTimeline()">Clear timeline</button></div></div>
   </div>
   <div id="assetForm" style="display:none">
     <div class="result-grid">
@@ -723,43 +779,111 @@ async function buildVideoPlan(){
   }
 }
 
+window.storyforgeCurrentVideo = null;
+window.storyforgeVideoClips = window.storyforgeVideoClips || [];
+function selectedVideoStoryboardShot(){
+ const state=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-state")||"{}")}catch(_){return {}}})();
+ const bible=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-bible")||"{}")}catch(_){return {}}})();
+ const shots=Array.isArray(state.shots)?state.shots:(Array.isArray(bible.storyboard?.shots)?bible.storyboard.shots:[]);
+ return shots[Math.min(window.storyforgeVideoClips.length,Math.max(0,shots.length-1))]||shots[0]||{};
+}
+async function uploadVideoReference(){
+ const input=document.getElementById("videoImageFile"),status=document.getElementById("videoImageStatus");
+ const file=input?.files?.[0];if(!file)return;
+ if(!/^image\/(png|jpeg|webp)$/.test(file.type)){status.textContent="Choose a PNG, JPG or WebP image.";input.value="";return}
+ if(file.size>8*1024*1024){status.textContent="Image must be smaller than 8 MB.";input.value="";return}
+ status.textContent="Uploading reference image…";
+ try{
+  const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error("Could not read that image."));reader.readAsDataURL(file)});
+  const response=await fetch("/api/video-reference",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({dataUrl})});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||"Image upload failed.");
+  document.getElementById("videoImageUrl").value=data.url;
+  status.textContent="Reference uploaded. It will be available for 60 minutes.";
+ }catch(error){status.textContent=error.message||"Image upload failed."}
+}
 async function generateVideo(){
- const button=document.getElementById("videoGenerateButton");
- const output=document.getElementById("toolOutput");
+ const button=document.getElementById("videoGenerateButton"),output=document.getElementById("toolOutput");
  const title=(document.getElementById("videoTitle")?.value||"THE QUEUE").trim();
- button.disabled=true;button.textContent="Rendering video…";
+ const duration=Math.max(2,Math.min(15,Number(document.getElementById("videoDuration")?.value||5)));
+ const aspectRatio=document.getElementById("videoAspectRatio")?.value||"16:9";
+ const model=document.getElementById("videoModel")?.value||"alibaba/wan-2.2-fast";
+ const camera=document.getElementById("videoCamera")?.value||"Slow dolly in";
+ const visualStyle=document.getElementById("videoVisualStyle")?.value||"painterly 2D animation";
+ const lighting=document.getElementById("videoLighting")?.value||"Atmospheric cinematic lighting";
+ const imageUrl=(document.getElementById("videoImageUrl")?.value||"").trim();
+ const userPrompt=(document.getElementById("videoPrompt")?.value||"").trim();
+ if(document.getElementById("videoInputMode")?.value==="image"&&!imageUrl){toast("Upload a reference image or paste an image URL first.");return}
+ if(imageUrl&&!/^https:\/\//i.test(imageUrl)){toast("Reference image URL must begin with https://");return}
+ button.disabled=true;button.textContent="Generating…";
  output.style.display="block";
- output.innerHTML="<h4>Rendering your video…</h4><p style='color:#aaa'>StoryForge is asking the video model to create a moving clip. This can take a few minutes. Keep this page open.</p><div class='reference-spinner' style='margin:16px 0;width:28px;height:28px'></div>";
+ output.innerHTML="<h4>Generating your video clip…</h4><p style='color:#aaa'>The selected video model is creating motion from your prompt"+(imageUrl?" and reference image":"")+". This can take a few minutes. Keep this page open.</p><div class='reference-spinner' style='margin:16px 0;width:28px;height:28px'></div>";
  try{
   const bible=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-bible")||"{}")}catch(_){return {}}})();
   const state=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-state")||"{}")}catch(_){return {}}})();
-  const shots=Array.isArray(state.shots)?state.shots:[];
-  const selectedShot=shots[0]||{};
+  const selectedShot=selectedVideoStoryboardShot();
   const world=bible.world||state.world||window.storyforgeWorldBible||"retro-futuristic South Africa in 2094";
   const characters=bible.characters||state.characters||window.storyforgeCharacterBible||"Thabo Ndlovu, Nomsa Khumalo, Aiden Mokoena, Rafiq Sayed and Zola Maseko";
   const scene=bible.scene||state.scene||window.storyforgeScene||{};
   const shotDescription=[selectedShot.shotType,selectedShot.camera,selectedShot.action,selectedShot.visualPrompt].filter(Boolean).join(". ");
+  const isQueue=/queue/i.test(title);
+  const styleGuard=isQueue?"LOCKED SHOW STYLE: painterly 2D animated science-fiction drama, hand-painted textures, expressive original African character designs, graphic shadows, illustrated cinematic lighting, atmospheric depth, retro-futuristic South African environments. STRICTLY animated, never photorealistic, hyperrealistic or live-action.":"VISUAL STYLE: "+visualStyle+", clear art direction and consistent materials.";
   const prompt=[
-   "Create a finished "+Math.max(2,Math.min(10,Number(document.getElementById("videoDuration")?.value||4)))+"-second cinematic animated video clip for the original series "+title+".",
-   "LOCKED VISUAL STYLE: original painterly, highly stylized animation; expressive hand-designed characters; hand-painted textures; bold graphic shadows; cinematic illustrated lighting; atmospheric depth; retro-futuristic South African environments. STRICTLY animated, never photorealistic, hyperrealistic or live-action.",
-   "WORLD: "+String(world),
-   "CHARACTERS AND CONTINUITY: "+String(characters),
+   "Create one finished "+duration+"-second video shot for "+title+".",
+   styleGuard,
+   "WORLD AND SETTING: "+String(typeof world==="string"?world:JSON.stringify(world)),
+   "CHARACTER CONTINUITY: "+String(typeof characters==="string"?characters:JSON.stringify(characters)),
    "SCENE CONTEXT: "+JSON.stringify(scene),
-   "STORYBOARD SHOT: "+(shotDescription||"A cinematic establishing moment in the story world."),
-   "Use coherent continuous motion, stable character identity, clear composition, natural movement and a deliberate camera move. No titles, captions, logos or watermarks."
-  ].join("\\n");
-  const duration=Math.max(2,Math.min(10,Number(document.getElementById("videoDuration")?.value||4)));
-  const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:"wan",duration})});
-  const data=await response.json();
-  if(!response.ok)throw new Error(data.error||"Video generation failed.");
+   shotDescription?"STORYBOARD DIRECTION: "+shotDescription:"",
+   userPrompt?"DIRECTOR'S SHOT INSTRUCTION: "+userPrompt:"",
+   "CAMERA: "+camera+". Use one deliberate camera move with readable, continuous motion.",
+   "LIGHTING AND MOOD: "+lighting+".",
+   "COMPOSITION: aspect ratio "+aspectRatio+". Establish clear foreground, midground and background; keep important faces and action inside frame.",
+   imageUrl?"Use the supplied reference image as the starting frame and preserve its character identity, costume, design and composition. Animate only the movement described; do not redesign the subject.":"",
+   "No titles, subtitles, captions, logos or watermarks. Avoid flicker, morphing, duplicate characters and sudden scene changes."
+  ].filter(Boolean).join("\n");
+  const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model,duration,aspectRatio,image:imageUrl||undefined,audio:document.getElementById("videoAudio")?.value!=="no"})});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||"Video generation failed.");
   if(!data.url||!String(data.url).startsWith("data:video/"))throw new Error("The provider did not return a playable video file.");
-  output.innerHTML="<h4>Video rendered successfully</h4><p><strong>"+escapeHtml(title)+"</strong> · "+escapeHtml(String(data.duration||duration))+"s</p><video controls autoplay playsinline src='"+data.url+"' style='display:block;width:100%;max-height:620px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#aaa;font-size:12px;margin-top:10px'>Your generated video is ready. Use the player controls to replay it.</p><button class='copy-btn' onclick='generateVideo()'>Render another clip →</button>";
-  toast("Video rendered successfully.");
+  window.storyforgeCurrentVideo={url:data.url,title,model,duration:Number(data.duration||duration),aspectRatio,prompt,shot:shotDescription||userPrompt||"Custom shot"};
+  document.getElementById("videoAddClipButton").disabled=false;
+  output.innerHTML="<h4>Video clip generated</h4><p><strong>"+escapeHtml(title)+"</strong> · "+escapeHtml(String(data.duration||duration))+"s · "+escapeHtml(model)+" · "+escapeHtml(aspectRatio)+"</p><video controls autoplay playsinline src='"+data.url+"' style='display:block;width:100%;max-height:620px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#aaa;font-size:12px;margin-top:10px'>Review the shot. Add it to the timeline to include it in your final edit.</p><a class='copy-btn' href='"+data.url+"' download='storyforge-clip.mp4' style='display:inline-block;text-decoration:none'>Download this clip ↓</a>";
+  toast("Video clip generated. Add it to your timeline.");
  }catch(error){
-  output.innerHTML="<h4>Video could not be rendered</h4><p style='color:#f0a0a0'>"+escapeHtml(error.message||"Unknown video error")+"</p><p style='color:#aaa'>Your saved story, characters and storyboard are unchanged. You can retry after correcting the provider error.</p><button class='copy-btn' onclick='generateVideo()'>Try rendering again →</button>";
+  output.innerHTML="<h4>Video generation failed</h4><p style='color:#f0a0a0'>"+escapeHtml(error.message||"Unknown video error")+"</p><p style='color:#aaa'>Your story and storyboard are unchanged. If this is a provider or balance error, the message above will identify it.</p><button class='copy-btn' onclick='generateVideo()'>Try again →</button>";
   toast(error.message||"Video generation failed.");
- }finally{button.disabled=false;button.textContent="Render Video →"}
+ }finally{button.disabled=false;button.textContent="Generate video clip →"}
 }
+function renderVideoTimeline(){
+ const clips=window.storyforgeVideoClips||[],timeline=document.getElementById("videoTimeline");
+ document.getElementById("videoTimelineCount").textContent=clips.length+" clip"+(clips.length===1?"":"s")+" · "+clips.reduce((sum,c)=>sum+(Number(c.duration)||0),0)+"s";
+ document.getElementById("videoAssembleButton").disabled=clips.length<2;
+ if(!clips.length){timeline.textContent="Generate a clip, then add it here. Add at least two clips to export a complete MP4.";return}
+ timeline.innerHTML=clips.map((c,i)=>"<div style='display:flex;gap:10px;align-items:center;border:1px solid #2a2a2a;background:#0d0d0d;padding:10px;border-radius:9px;margin-bottom:8px'><video muted playsinline src='"+c.url+"' style='width:88px;height:58px;object-fit:cover;background:#000;border-radius:5px'></video><div style='flex:1;min-width:0'><strong style='font-size:12px'>"+(i+1)+". "+escapeHtml(c.shot||c.title)+"</strong><div style='color:#888;font-size:11px;margin-top:4px'>"+escapeHtml(String(c.duration))+"s · "+escapeHtml(c.aspectRatio)+"</div></div><button class='copy-btn' style='margin:0' onclick='removeVideoClip("+i+")'>Remove</button></div>").join("");
+}
+function addVideoClipToTimeline(){
+ const clip=window.storyforgeCurrentVideo;if(!clip){toast("Generate a video clip first.");return}
+ if(window.storyforgeVideoClips.length>=12){toast("The timeline supports up to 12 clips per export.");return}
+ window.storyforgeVideoClips.push({...clip});
+ renderVideoTimeline();document.getElementById("videoAddClipButton").disabled=true;toast("Clip added to timeline.");
+}
+function removeVideoClip(index){window.storyforgeVideoClips.splice(index,1);renderVideoTimeline()}
+function clearVideoTimeline(){window.storyforgeVideoClips=[];renderVideoTimeline();toast("Timeline cleared.")}
+async function assembleVideo(){
+ const button=document.getElementById("videoAssembleButton"),output=document.getElementById("toolOutput"),clips=window.storyforgeVideoClips||[];
+ if(clips.length<2){toast("Add at least two clips first.");return}
+ button.disabled=true;button.textContent="Assembling…";output.style.display="block";
+ output.innerHTML="<h4>Assembling your final MP4…</h4><p style='color:#aaa'>Normalising the shots and joining them in timeline order.</p><div class='reference-spinner' style='margin:16px 0;width:28px;height:28px'></div>";
+ try{
+  const response=await fetch("/api/assemble",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clips:clips.map(c=>c.url),aspectRatio:document.getElementById("videoAspectRatio")?.value||"9:16"})});
+  if(!response.ok){let message="Video assembly failed.";try{const data=await response.json();message=data.error||message}catch(_){}throw new Error(message)}
+  const blob=await response.blob();if(!blob.size)throw new Error("The exported MP4 was empty.");
+  const url=URL.createObjectURL(blob);
+  output.innerHTML="<h4>Final video ready</h4><p><strong>"+escapeHtml(document.getElementById("videoTitle")?.value||"StoryForge video")+"</strong> · "+clips.length+" shots · "+clips.reduce((sum,c)=>sum+(Number(c.duration)||0),0)+"s planned runtime</p><video controls playsinline src='"+url+"' style='display:block;width:100%;max-height:620px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#aaa;font-size:12px;margin-top:10px'>Your clips have been assembled in timeline order.</p><a class='generate' href='"+url+"' download='storyforge-final.mp4' style='display:inline-block;text-decoration:none;padding:12px 16px;margin-top:8px'>Download finished MP4 ↓</a>";
+  toast("Final MP4 assembled.");
+ }catch(error){output.innerHTML="<h4>Could not assemble video</h4><p style='color:#f0a0a0'>"+escapeHtml(error.message||"Unknown assembly error")+"</p><p style='color:#aaa'>Your timeline clips are still available. You can retry the export.</p>";toast(error.message||"Assembly failed.")}
+ finally{button.disabled=(window.storyforgeVideoClips||[]).length<2;button.textContent="Assemble & export MP4 →"}
+}
+document.addEventListener("change",function(event){if(event.target&&event.target.id==="videoImageFile")uploadVideoReference()});
 
 async function buildAsset(){
  const payload={type:assetType.value,style:assetStyle.value,subject:assetSubject.value,mood:assetMood.value,notes:assetNotes.value};
