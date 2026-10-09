@@ -41,8 +41,8 @@
   };
   const steps = [
     {id:"story",label:"1. Story",tool:null,done:p=>!!(p.title||val("resultTitle"))},
-    {id:"world",label:"2. World",tool:"world",done:p=>!!(p.world||storyBible().world)},
-    {id:"characters",label:"3. Characters",tool:"character",done:p=>(storyBible().characters||[]).length>0},
+    {id:"world",label:"2. World",tool:"world",done:p=>!!(p.worldBuiltAt||(p.world&&typeof p.world==="object"&&p.world.setting&&p.world.visualIdentity)||(storyBible().world&&storyBible().world.setting&&storyBible().world.visualIdentity))},
+    {id:"characters",label:"3. Characters",tool:"character",done:p=>!!(p.charactersBuiltAt||(storyBible().characters||[]).length>0)},
     {id:"scene",label:"4. Scene",tool:"scene",done:p=>!!(p.scene||window.storyforgeScene)},
     {id:"storyboard",label:"5. Storyboard",tool:"storyboard",done:p=>!!(p.storyboard&&p.storyboard.shots&&p.storyboard.shots.length)},
     {id:"video",label:"6. Video",tool:"video",done:p=>!!(p.videoRenderedAt||p.video?.renderedAt)}
@@ -89,8 +89,8 @@
     const p=read(); if(!p.visualStyle)write({visualStyle:STYLE});
     syncContext();
     installWrapper("createStory",()=>{saveStoryFromPage();const title=val("resultTitle")||val("idea");if(title)write({title,idea:val("idea"),logline:byId("logline")?.textContent||""});syncContext();});
-    installWrapper("buildWorld",()=>{const world={name:val("worldName"),tone:val("worldTone"),premise:val("worldPremise"),setting:val("worldSetting"),visualIdentity:window.storyforgeWorldBible||"",rules:[]};write({world});const bible=storyBible();bible.world=world;try{localStorage.setItem("storyforge-story-bible",JSON.stringify(bible));}catch(_){}syncContext();});
-    installWrapper("buildCharacter",()=>{saveStoryFromPage();syncContext();});
+    installWrapper("buildWorld",()=>{const world={name:val("worldName"),tone:val("worldTone"),premise:val("worldPremise"),setting:val("worldSetting"),visualIdentity:window.storyforgeWorldBible||"",rules:[]};write({world,worldBuiltAt:new Date().toISOString()});const bible=storyBible();bible.world=world;try{localStorage.setItem("storyforge-story-bible",JSON.stringify(bible));}catch(_){}syncContext();});
+    installWrapper("buildCharacter",()=>{write({charactersBuiltAt:new Date().toISOString()});saveStoryFromPage();syncContext();});
     installWrapper("generateScene",()=>{const scene=window.storyforgeScene||{};scene.premise=val("scenePremise");write({scene,world:window.storyforgeWorldBible||worldText(),characters:charactersText()});syncContext();});
     installWrapper("buildStoryboard",()=>{const state=(()=>{try{return JSON.parse(localStorage.getItem("storyforge-production-state")||"{}")}catch(_){return {}}})();write({storyboard:{title:val("boardTitle"),episode:Number(val("boardEpisode")||1),episodeTitle:val("boardEpisodeTitle"),premise:val("boardPremise"),shots:state.shots||[]},world:window.storyforgeWorldBible||worldText(),characters:charactersText()});syncContext();});
     installWrapper("buildVideoPlan",()=>{write({videoPlan:{title:val("videoTitle"),format:val("videoFormat"),shots:val("videoShots"),duration:val("videoDuration"),captions:val("videoCaptions")}});syncContext();});
