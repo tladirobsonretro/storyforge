@@ -599,7 +599,7 @@ document.addEventListener("click", function(event) {
  const button = event.target && event.target.closest ? event.target.closest("button[onclick]") : null;
  if (!button) return;
  const source = button.getAttribute("onclick") || "";
- const match = source.match(/^\\s*([A-Za-z_$][\\w$]*)\\s*\\(([^)]*)\\)\\s*;?\\s*$/);
+ const match = source.match(/^\s*([A-Za-z_$][\w$]*)\s*\(([^)]*)\)\s*;?\s*$/);
  if (!match) return;
  const name = match[1], args = match[2].trim();
  const noArgActions = new Set(["showSavedStories","buildWorld","buildCharacter","generateCharacterReference","generateScene","buildStoryboard","buildVideoPlan","generateVideo","buildAsset","generateImage","focusPrompt","createStory","saveProject"]);
