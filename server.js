@@ -413,7 +413,7 @@ app.get("/", (req, res) => {
       <div class="result-box"><h4>Total duration (seconds)</h4><input id="videoDuration" class="tool-input" type="number" min="1" max="60" value="29"></div>
       <div class="result-box"><h4>Captions</h4><select id="videoCaptions" class="tool-input"><option value="yes">Yes</option><option value="no">No</option></select></div>
     </div>
-    <button class="generate tool-action" onclick="buildVideoPlan()">Build edit plan →</button><button id="videoGenerateButton" class="copy-btn" onclick="generateVideo()">Generate test clip →</button>
+    <button class="generate tool-action" onclick="buildVideoPlan()">Prepare Video →</button><button id="videoGenerateButton" class="copy-btn" onclick="generateVideo()">Render Video →</button>
   </div>
   <div id="assetForm" style="display:none">
     <div class="result-grid">
@@ -562,10 +562,10 @@ async function buildStoryboard(){
  toast("Storyboard forged: "+data.shots.length+" shots.");
 }
 async function buildVideoPlan(){
-  const button=[...document.querySelectorAll("button")].find(b=>/build edit plan/i.test(b.textContent||""));
+  const button=[...document.querySelectorAll("button")].find(b=>/prepare video/i.test(b.textContent||""));
   if(window.storyforgeBuildingEditPlan)return;
   window.storyforgeBuildingEditPlan=true;
-  const originalText=button?button.textContent:"Build edit plan →";
+  const originalText=button?button.textContent:"Prepare Video →";
   let overlay=document.getElementById("videoPlanLoadingOverlay");
   if(!overlay){
     overlay=document.createElement("div");overlay.id="videoPlanLoadingOverlay";
@@ -597,9 +597,9 @@ async function buildVideoPlan(){
     if(!response.ok)throw new Error(data.error||"The edit-plan service returned an error.");
     if(output){
       const steps=Array.isArray(data.renderPlan)?data.renderPlan:[];
-      output.innerHTML="<h4>Video edit plan ready</h4><p><strong>"+escapeHtml(data.title||payload.title)+"</strong> · "+escapeHtml(data.format||payload.format)+" · "+escapeHtml(data.aspectRatio||"")+" · "+escapeHtml(String(data.duration||payload.duration))+"s</p><p><strong>Audio:</strong> "+escapeHtml(data.audio||"Not specified")+"</p><p><strong>Captions:</strong> "+((data.captions??payload.captions)?"Enabled":"Disabled")+"</p><h4 style='margin-top:18px'>Render plan</h4><ol>"+steps.map(x=>"<li>"+escapeHtml(String(x))+"</li>").join("")+"</ol><p style='color:#777;font-size:12px'>Status: "+escapeHtml(data.status||"Ready")+" · Edit plan created. Actual video rendering is a separate step.</p>";
+      output.innerHTML="<h4>Video preparation ready</h4><p><strong>"+escapeHtml(data.title||payload.title)+"</strong> · "+escapeHtml(data.format||payload.format)+" · "+escapeHtml(data.aspectRatio||"")+" · "+escapeHtml(String(data.duration||payload.duration))+"s</p><p><strong>Audio:</strong> "+escapeHtml(data.audio||"Not specified")+"</p><p><strong>Captions:</strong> "+((data.captions??payload.captions)?"Enabled":"Disabled")+"</p><h4 style='margin-top:18px'>Render plan</h4><ol>"+steps.map(x=>"<li>"+escapeHtml(String(x))+"</li>").join("")+"</ol><p style='color:#777;font-size:12px'>Status: "+escapeHtml(data.status||"Ready")+" · Preparation complete. Select Render Video to generate the clip.</p>";
     }
-    toast("Video edit plan built.");
+    toast("Video preparation completed.");
   }catch(error){
     if(output)output.innerHTML="<h4>Could not build the edit plan</h4><p style='color:#f0a0a0'>"+escapeHtml(error.message||"Unknown error")+"</p><p style='color:#aaa'>Check your connection and try again. Your story and storyboard remain saved.</p><button class='copy-btn' onclick='buildVideoPlan()'>Try again →</button>";
     toast("Edit plan failed: "+(error.message||"Unknown error"));
@@ -618,7 +618,7 @@ async function generateVideo(){
   const data=await response.json(); if(!response.ok) throw new Error(data.error||"Video generation failed.");
   toolOutput.style.display="block"; toolOutput.innerHTML+="<h4 style='margin-top:18px'>Generated test clip</h4><video controls playsinline src='"+data.url+"' style='width:100%;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#666;font-size:11px'>Generated with "+data.model+" · "+data.duration+"s.</p>";
   toast("Video clip generated.");
- }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Generate test clip →"}
+ }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent="Render Video →"}
 }
 
 async function buildAsset(){
