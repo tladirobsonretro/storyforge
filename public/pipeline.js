@@ -45,7 +45,7 @@
     {id:"characters",label:"3. Characters",tool:"character",done:p=>(storyBible().characters||[]).length>0},
     {id:"scene",label:"4. Scene",tool:"scene",done:p=>!!(p.scene||window.storyforgeScene)},
     {id:"storyboard",label:"5. Storyboard",tool:"storyboard",done:p=>!!(p.storyboard&&p.storyboard.shots&&p.storyboard.shots.length)},
-    {id:"video",label:"6. Video",tool:"video",done:p=>!!p.videoPlan}
+    {id:"video",label:"6. Video",tool:"video",done:p=>!!(p.videoRenderedAt||p.video?.renderedAt)}
   ];
   function activeStep(p) { const i=steps.findIndex(s=>!s.done(p)); return i<0?steps.length-1:i; }
   function renderFlow() {
@@ -117,7 +117,7 @@
       const data=await response.json();if(!response.ok)throw new Error(data.error||"Video generation failed.");
       const output=byId("toolOutput");output.style.display="block";
       output.innerHTML+="<h4 style='margin-top:18px'>Generated context-aware clip</h4><video controls playsinline src='"+data.url+"' style='width:100%;max-height:520px;background:#080808;border:1px solid #292929;border-radius:10px'></video><p style='color:#888;font-size:11px'>Generated using the saved world, characters, scene and storyboard context.</p>";
-      if(typeof window.toast==="function")window.toast("Context-aware clip generated.");
+      write({videoRenderedAt:new Date().toISOString(),video:{title,duration:4,model:data.model||"alibaba/wan-2.2-fast",renderedAt:new Date().toISOString()}});if(typeof window.persistActiveProjectState==="function")window.persistActiveProjectState();renderFlow();if(typeof window.toast==="function")window.toast("Context-aware clip generated.");
     }catch(error){if(typeof window.toast==="function")window.toast(error.message);}
     finally{button.disabled=false;button.textContent="Generate test clip →";}
   };
