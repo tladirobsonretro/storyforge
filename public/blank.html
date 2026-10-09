@@ -61,7 +61,7 @@ textarea::placeholder,input::placeholder{color:#656565}
 .saved-title{font-size:14px;font-weight:600;overflow-wrap:anywhere}
 .saved-meta{font-size:12px;color:#888;margin-top:5px}
 .saved-actions{display:flex;gap:7px;flex-shrink:0}
-.empty{border:1px dashed #303030;border-radius:12px;padding:24px;text-align:center;color:#888;font-size:13px;line-height:1.6}
+.empty{border:1px dashed #303030;border-radius:12px;padding:24px;text-align:center;color:#888;font-size:13px;line-height:1.6}\n.auth-card{max-width:470px;margin:36px auto 0;border:1px solid #303030;background:var(--panel);border-radius:15px;padding:22px}.auth-card .field{margin-bottom:15px}.auth-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.account-note{font-size:12px;color:#999;line-height:1.6;margin-top:12px}
 .footer-note{color:#666;font-size:11px;line-height:1.5;margin-top:20px}
 @media(max-width:650px){.topbar{min-height:64px;padding:0 17px}.brand{font-size:17px}.top-actions{gap:6px}.btn{padding:9px 10px;font-size:12px}main{padding-top:37px}.intro{margin-bottom:22px}.home{margin-top:25px}.field-grid{grid-template-columns:1fr;gap:15px}.field.full{grid-column:auto}.workshop-head{display:block}.workshop-head>.btn{margin-top:12px}.save-row{align-items:stretch;flex-direction:column}.save-row .btn{width:100%}.saved-item{align-items:flex-start;flex-direction:column}.saved-actions{width:100%}.saved-actions .btn{flex:1}.categories{gap:7px}.category{font-size:13px}}
 </style>
@@ -69,7 +69,7 @@ textarea::placeholder,input::placeholder{color:#656565}
 <body>
 <header class="topbar">
   <a class="brand" href="/" id="brandHome" aria-label="StoryForge home"><span class="brand-mark" aria-hidden="true"></span><span>StoryForge</span></a>
-  <div class="top-actions"><button class="btn" id="projectsButton" type="button">My projects</button></div>
+  <div class="top-actions"><button class="btn" id="projectsButton" type="button">My projects</button><button class="btn" id="authButton" type="button">Sign in</button><button class="btn hidden" id="signOutButton" type="button">Sign out</button></div>
 </header>
 <main>
   <section id="homeView">
@@ -128,78 +128,54 @@ textarea::placeholder,input::placeholder{color:#656565}
       </div>
       <div class="production-note"><strong>Production target (editable later):</strong> Plan the story first, then break episodes into manageable shots. For a 20-minute episode, 30-second clips would mean about <strong>40 clips</strong>. This is a planning estimate, not a promise that AI can generate every clip consistently.</div>
       <div class="save-row"><button class="btn" id="saveAndHome" type="button">Save project</button><button class="btn primary" id="saveProjectButton" type="button">Save series foundation ✓</button></div>
-      <p class="footer-note">This first workshop uses your browser to save projects on this device. It does not call an AI, image or video generation service. Saved projects are not yet synced between devices.</p>
+      <p class="footer-note" id="storageFootnote">Sign in to sync your series foundation across devices. This step does not call an AI, image or video generation service.</p>
     </div>
   </section>
 
-  <section id="projectsView" class="hidden">
+  <section id="authView" class="hidden"><div class="intro"><div class="eyebrow">Your StoryForge account</div><h1 id="authHeading">Your stories, wherever you are.</h1><p class="subheading">Sign in to save and open your series projects on different devices.</p></div><div class="auth-card"><form id="authForm"><div class="field"><label class="label" for="authEmail">Email address</label><input id="authEmail" type="email" autocomplete="email" required placeholder="you@example.com"></div><div class="field"><label class="label" for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required placeholder="At least 6 characters"></div><div class="auth-actions"><button class="btn primary" id="authSubmit" type="submit">Sign in</button><button class="btn" id="authModeButton" type="button">Create account</button></div></form><div class="account-note" id="authNotice" role="status" aria-live="polite">Use the same email and password on every device.</div></div></section>\n  <section id="projectsView" class="hidden">
     <div class="workshop-head"><div><div class="eyebrow">Your workspace</div><h1>Your projects</h1><p class="subheading" style="text-align:left">Open a saved series foundation and continue developing it.</p></div><button class="btn" id="newProjectButton" type="button">+ New project</button></div>
     <div id="savedProjects" class="saved-list"></div>
-    <p class="footer-note">Projects are saved in this browser on this device.</p>
+    <p class="footer-note" id="projectsFootnote">Sign in to sync projects across devices. Existing local projects can be imported.</p>
   </section>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 <script>
 (function(){
  const $=id=>document.getElementById(id);
- const keys={projects:'storyforge-workshop-projects-v1',active:'storyforge-workshop-active-v1'};
+ const keys={projects:'storyforge-workshop-projects-v1',active:'storyforge-workshop-active-v1',imports:'storyforge-cloud-imported-local-v1'};
  const fields=['seriesTitle','format','genre','audience','premise','hook','setting','worldRules','tone','protagonist','antagonist','relationships','conflict','engine','seasonDestination','cliffhanger'];
- let selectedType='Video',activeId=null;
+ const db=window.supabase?.createClient('https://bbredattebczoalryvwg.supabase.co','sb_publishable_vhCQCuQ0BgmJ0yDv1U3-qg_2PJsAW-u',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+ let selectedType='Video',activeId=null,currentUser=null,authMode='signin',authBusy=false;
  function readProjects(){try{const p=JSON.parse(localStorage.getItem(keys.projects)||'[]');return Array.isArray(p)?p:[]}catch(e){return []}}
  function writeProjects(p){localStorage.setItem(keys.projects,JSON.stringify(p))}
- function show(view){['homeView','workshopView','projectsView'].forEach(id=>$(id).classList.toggle('hidden',id!==view));window.scrollTo({top:0,behavior:'instant'})}
- function updateCreate(){ $('createButton').disabled=!$('idea').value.trim() }
- function newProject(){
-  activeId=null;fields.forEach(id=>{if(id==='format')$(id).value='Animated series';else $(id).value=''});
-  $('premise').value=$('idea').value.trim();
-  const raw=$('idea').value.trim().replace(/\s+/g,' ');
-  $('seriesTitle').value=raw?(raw.length>52?raw.slice(0,49).replace(/\s+\S*$/,'')+'…':raw):'';
-  $('saveStatus').textContent='Not saved yet';
-  $('workshopHeading').textContent='Your series foundation';
-  show('workshopView');
- }
- function collect(){
-  const data={};fields.forEach(id=>data[id]=$(id).value);
-  data.id=activeId||('sf-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7));
-  data.projectType=selectedType;data.updatedAt=new Date().toISOString();
-  data.createdAt=(readProjects().find(p=>p.id===data.id)||{}).createdAt||data.updatedAt;
-  return data;
- }
- function saveProject(){
-  const data=collect();
-  if(!data.seriesTitle.trim()&&!data.premise.trim()){ $('saveStatus').textContent='Add a working title or premise before saving.';return }
-  const projects=readProjects();const index=projects.findIndex(p=>p.id===data.id);
-  if(index>=0)projects[index]=data;else projects.unshift(data);
-  try{writeProjects(projects);activeId=data.id;localStorage.setItem(keys.active,activeId);$('saveStatus').textContent='Saved in this browser · '+new Date(data.updatedAt).toLocaleString();$('workshopHeading').textContent=data.seriesTitle||'Untitled series';}
-  catch(e){$('saveStatus').textContent='Could not save. Browser storage may be full or disabled.'}
- }
- function openProject(id){
-  const p=readProjects().find(x=>x.id===id);if(!p)return;
-  activeId=p.id;selectedType=p.projectType||'Video';fields.forEach(key=>{if($(key))$(key).value=p[key]|| (key==='format'?'Animated series':'')});
-  $('saveStatus').textContent='Saved in this browser · '+new Date(p.updatedAt||p.createdAt).toLocaleString();
-  $('workshopHeading').textContent=p.seriesTitle||'Untitled series';localStorage.setItem(keys.active,activeId);show('workshopView');
- }
+ function show(view){['homeView','workshopView','projectsView','authView'].forEach(id=>$(id).classList.toggle('hidden',id!==view));window.scrollTo({top:0,behavior:'instant'})}
+ function updateCreate(){$('createButton').disabled=!$('idea').value.trim()}
+ function setAccountUI(){$('authButton').classList.toggle('hidden',!!currentUser);$('signOutButton').classList.toggle('hidden',!currentUser);$('projectsFootnote').textContent=currentUser?'Signed in as '+currentUser.email+'. Projects are stored in your cloud workspace.':'Sign in to sync projects across devices. Existing local projects can be imported.';$('storageFootnote').textContent=currentUser?'Cloud sync is on for '+currentUser.email+'. Save changes to access them on other devices.':'Sign in to sync your series foundation across devices. This step does not call an AI, image or video generation service.'}
+ function newProject(){activeId=null;fields.forEach(id=>{if(id==='format')$(id).value='Animated series';else $(id).value=''});$('premise').value=$('idea').value.trim();const raw=$('idea').value.trim().replace(/\s+/g,' ');$('seriesTitle').value=raw?(raw.length>52?raw.slice(0,49).replace(/\s+\S*$/,'')+'…':raw):'';$('saveStatus').textContent='Not saved yet';$('workshopHeading').textContent='Your series foundation';show('workshopView')}
+ function collect(){const data={};fields.forEach(id=>data[id]=$(id).value);data.id=activeId||('sf-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7));data.projectType=selectedType;data.updatedAt=new Date().toISOString();data.createdAt=(readProjects().find(p=>p.id===data.id)||{}).createdAt||data.updatedAt;return data}
+ function cloudProject(row){return {...(row.project_data||{}),id:row.id,projectType:row.project_type,createdAt:row.created_at,updatedAt:row.updated_at,seriesTitle:row.title||row.project_data?.seriesTitle||'Untitled series'}}
+ async function listProjects(){if(!currentUser||!db)return readProjects();const {data,error}=await db.from('storyforge_projects').select('*').order('updated_at',{ascending:false});if(error)throw error;return (data||[]).map(cloudProject)}
+ async function importLocalProjects(){if(!currentUser||!db)return;const locals=readProjects();if(!locals.length)return;let imported={};try{imported=JSON.parse(localStorage.getItem(keys.imports)||'{}')||{}}catch(e){}for(const p of locals.filter(p=>!imported[p.id])){const {data,error}=await db.from('storyforge_projects').insert({title:(p.seriesTitle||'Untitled series').slice(0,200),project_type:['Video','Audio','Image'].includes(p.projectType)?p.projectType:'Video',project_data:p}).select('id').single();if(error)throw error;imported[p.id]=data.id;localStorage.setItem(keys.imports,JSON.stringify(imported))}}
+ async function saveProject(){const data=collect();if(!data.seriesTitle.trim()&&!data.premise.trim()){$('saveStatus').textContent='Add a working title or premise before saving.';return}try{if(currentUser&&db){const payload={title:(data.seriesTitle||'Untitled series').slice(0,200),project_type:['Video','Audio','Image'].includes(data.projectType)?data.projectType:'Video',project_data:data,updated_at:new Date().toISOString()};let result;if(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(activeId||'')){result=await db.from('storyforge_projects').update(payload).eq('id',activeId).select('*').single()}else{result=await db.from('storyforge_projects').insert(payload).select('*').single()}if(result.error)throw result.error;activeId=result.data.id;$('saveStatus').textContent='Saved to your StoryForge account · '+new Date(result.data.updated_at).toLocaleString()}else{const projects=readProjects(),index=projects.findIndex(p=>p.id===data.id);if(index>=0)projects[index]=data;else projects.unshift(data);writeProjects(projects);activeId=data.id;localStorage.setItem(keys.active,activeId);$('saveStatus').textContent='Saved on this device · Sign in to sync across devices'}$('workshopHeading').textContent=data.seriesTitle||'Untitled series'}catch(e){$('saveStatus').textContent='Could not save: '+(e.message||'Please try again.')}} 
+ async function openProject(id){try{const p=(await listProjects()).find(x=>x.id===id);if(!p)return;activeId=p.id;selectedType=p.projectType||'Video';fields.forEach(key=>{if($(key))$(key).value=p[key]||(key==='format'?'Animated series':'')});$('saveStatus').textContent=(currentUser?'Saved to your StoryForge account':'Saved on this device')+' · '+new Date(p.updatedAt||p.createdAt).toLocaleString();$('workshopHeading').textContent=p.seriesTitle||'Untitled series';localStorage.setItem(keys.active,activeId);show('workshopView')}catch(e){$('savedProjects').insertAdjacentHTML('afterbegin','<div class="empty">Could not load projects. '+escapeHtml(e.message||'Please try again.')+'</div>')}}
  function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
- function renderProjects(){
-  const projects=readProjects(),root=$('savedProjects');
-  if(!projects.length){root.innerHTML='<div class="empty">No saved projects yet.<br>Start with an idea and save your first series foundation.</div>';return}
-  root.innerHTML=projects.map(p=>'<div class="saved-item"><div><div class="saved-title">'+escapeHtml(p.seriesTitle||'Untitled series')+'</div><div class="saved-meta">'+escapeHtml(p.projectType||'Video')+' · Updated '+escapeHtml(new Date(p.updatedAt||p.createdAt).toLocaleDateString())+'</div></div><div class="saved-actions"><button class="btn primary" data-open="'+escapeHtml(p.id)+'">Open</button><button class="btn" data-delete="'+escapeHtml(p.id)+'">Delete</button></div></div>').join('');
- }
+ async function renderProjects(){const root=$('savedProjects');root.innerHTML='<div class="empty">Loading projects…</div>';try{const projects=await listProjects();if(!projects.length){root.innerHTML='<div class="empty">No projects yet. Start with an idea and save your first series foundation.</div>';return}root.innerHTML=projects.map(p=>'<div class="saved-item"><div><div class="saved-title">'+escapeHtml(p.seriesTitle||'Untitled series')+'</div><div class="saved-meta">'+escapeHtml(p.projectType||'Video')+' · Updated '+escapeHtml(new Date(p.updatedAt||p.createdAt).toLocaleDateString())+'</div></div><div class="saved-actions"><button class="btn primary" data-open="'+escapeHtml(p.id)+'">Open</button><button class="btn" data-delete="'+escapeHtml(p.id)+'">Delete</button></div></div>').join('')}catch(e){root.innerHTML='<div class="empty">Could not load projects. '+escapeHtml(e.message||'Please try again.')+'</div>'}}
+ function showAuth(){authMode='signin';$('authHeading').textContent='Your stories, wherever you are.';$('authSubmit').textContent='Sign in';$('authModeButton').textContent='Create account';$('authNotice').textContent='Use the same email and password on every device.';show('authView')}
+ $('authModeButton').addEventListener('click',()=>{authMode=authMode==='signin'?'signup':'signin';$('authHeading').textContent=authMode==='signup'?'Create your StoryForge account':'Your stories, wherever you are.';$('authSubmit').textContent=authMode==='signup'?'Create account':'Sign in';$('authModeButton').textContent=authMode==='signup'?'Back to sign in':'Create account';$('authPassword').autocomplete=authMode==='signup'?'new-password':'current-password';$('authNotice').textContent=authMode==='signup'?'Use an email address you can access. Check your inbox if confirmation is required.':'Use the same email and password on every device.'});
+ $('authForm').addEventListener('submit',async e=>{e.preventDefault();if(authBusy)return;if(!db){$('authNotice').textContent='Account service did not load. Refresh the page and try again.';return}const email=$('authEmail').value.trim(),password=$('authPassword').value;authBusy=true;$('authSubmit').disabled=true;$('authNotice').textContent=authMode==='signup'?'Creating account…':'Signing in…';try{const result=authMode==='signup'?await db.auth.signUp({email,password}):await db.auth.signInWithPassword({email,password});if(result.error)throw result.error;if(authMode==='signup'&&!result.data.session){$('authNotice').textContent='Account created. Check your email for a confirmation link, then return here to sign in.';return}currentUser=result.data.user||result.data.session?.user||null;if(currentUser){setAccountUI();await importLocalProjects();await renderProjects();show('projectsView')}}catch(err){$('authNotice').textContent=err.message||'Could not complete sign-in. Please try again.'}finally{authBusy=false;$('authSubmit').disabled=false}});
  $('idea').addEventListener('input',updateCreate);
  document.querySelectorAll('.category').forEach(btn=>btn.addEventListener('click',()=>{selectedType=btn.dataset.type;document.querySelectorAll('.category').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));$('homeNotice').textContent=selectedType+' selected. No media will be generated in this step.'}));
- $('createButton').addEventListener('click',()=>{if(!$('idea').value.trim())return;newProject()});
+ $('createButton').addEventListener('click',()=>{if($('idea').value.trim())newProject()});
  $('projectsButton').addEventListener('click',()=>{renderProjects();show('projectsView')});
- $('brandHome').addEventListener('click',e=>{e.preventDefault();show('homeView')});
- $('backButton').addEventListener('click',()=>show('homeView'));
- $('saveProjectButton').addEventListener('click',saveProject);
- $('saveAndHome').addEventListener('click',()=>{saveProject();if(activeId)show('projectsView'),renderProjects()});
+ $('authButton').addEventListener('click',showAuth);
+ $('signOutButton').addEventListener('click',async()=>{if(db){const {error}=await db.auth.signOut();if(error){alert(error.message);return}}currentUser=null;setAccountUI();show('homeView')});
+ $('brandHome').addEventListener('click',e=>{e.preventDefault();show('homeView')});$('backButton').addEventListener('click',()=>show('homeView'));$('saveProjectButton').addEventListener('click',saveProject);
+ $('saveAndHome').addEventListener('click',async()=>{await saveProject();if(activeId){await renderProjects();show('projectsView')}});
  $('newProjectButton').addEventListener('click',()=>{show('homeView');$('idea').value='';selectedType='Video';document.querySelectorAll('.category').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.type===selectedType)));updateCreate()});
- $('savedProjects').addEventListener('click',e=>{
-  const open=e.target.closest('[data-open]');if(open){openProject(open.dataset.open);return}
-  const del=e.target.closest('[data-delete]');if(del&&confirm('Delete this saved project? This cannot be undone.')){writeProjects(readProjects().filter(p=>p.id!==del.dataset.delete));renderProjects()}
- });
+ $('savedProjects').addEventListener('click',async e=>{const open=e.target.closest('[data-open]');if(open){await openProject(open.dataset.open);return}const del=e.target.closest('[data-delete]');if(del&&confirm('Delete this saved project? This cannot be undone.')){try{if(currentUser&&db){const {error}=await db.from('storyforge_projects').delete().eq('id',del.dataset.delete);if(error)throw error}else writeProjects(readProjects().filter(p=>p.id!==del.dataset.delete));await renderProjects()}catch(err){alert('Could not delete project: '+(err.message||'Please try again.'))}}});
  fields.forEach(id=>$(id).addEventListener('input',()=>{if(activeId)$('saveStatus').textContent='Unsaved changes · save to keep your edits'}));
- const last=localStorage.getItem(keys.active);if(last&&readProjects().some(p=>p.id===last)){/* leave the start screen clean; projects remain available under My projects */}
- updateCreate();
+ if(db){db.auth.onAuthStateChange((event,session)=>{currentUser=session?.user||null;setAccountUI();if(event==='SIGNED_IN'&&currentUser){importLocalProjects().then(renderProjects).catch(e=>{$('authNotice').textContent='Signed in, but project import failed: '+(e.message||'Please try again.')})}});db.auth.getSession().then(async({data,error})=>{if(error)throw error;currentUser=data.session?.user||null;setAccountUI();if(currentUser){try{await importLocalProjects()}catch(e){console.warn('StoryForge import:',e.message)}}}).catch(e=>console.warn('StoryForge auth:',e.message))}else{$('authNotice').textContent='Account service did not load. Refresh and try again.'}
+ setAccountUI();updateCreate();
 })();
 </script>
 </body>
