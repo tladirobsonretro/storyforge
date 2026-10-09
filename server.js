@@ -399,6 +399,56 @@ app.post("/api/generate", async (req, res) => {
   }
 });
 
+app.post("/api/create-format", async (req, res) => {
+  const input = req.body || {};
+  const format = String(input.format || "video").toLowerCase();
+  const formats = {
+    video: {
+      title: "Video production script",
+      instructions: "Create a practical opening-scene video production script. Include the title, suggested runtime, scene purpose and numbered shots. For each shot include duration, framing or camera movement, visual action, character continuity, dialogue or voice-over, sound or music and transition. Make it useful for producing a first video draft. Do not claim a video file has been rendered."
+    },
+    comic: {
+      title: "Comic book script",
+      instructions: "Write the opening as a comic-book script. Include a title and page count, then pages and numbered panels. For every panel include composition and artwork direction, character action or expression, speech-balloon dialogue and captions or sound effects where useful. Keep character appearances consistent and make the sequence easy to follow."
+    },
+    audiobook: {
+      title: "Audiobook script",
+      instructions: "Write an audiobook-ready opening script. Include title, narrator direction, character voice notes, spoken narration, clearly attributed dialogue and concise sound design cues in brackets. Make it natural to listen to. Do not claim audio has been recorded or generated."
+    },
+    book: {
+      title: "Opening chapter",
+      instructions: "Write the opening chapter of a novel in polished, immersive prose. Use a strong opening, sensory detail, a clear character perspective, natural dialogue and a compelling hook. Avoid outline format and production notes. Make it a substantial but manageable first draft."
+    }
+  };
+  if (!formats[format]) return res.status(400).json({ error: "Choose video, comic book, audiobook or book." });
+  const title = String(input.title || "Untitled story").trim();
+  const idea = String(input.idea || "").trim();
+  if (!idea) return res.status(400).json({ error: "The original story idea is required." });
+  if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({ error: "The AI connection is unavailable. Please try again when StoryForge's AI service is connected." });
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai",
+        messages: [
+          { role: "system", content: "You are StoryForge's format-specific story adapter. Create original, coherent creative work from the established story facts. Do not replace the premise, rename established characters or contradict the world. Return readable plain text, not JSON or code fences. Never claim that images, video or audio have been rendered when you are only writing a plan or script." },
+          { role: "user", content: "FORMAT: " + format + "\nINSTRUCTIONS: " + formats[format].instructions + "\nTITLE: " + title + "\nORIGINAL IDEA: " + idea + "\nLOGLINE: " + String(input.logline || "") + "\nWORLD: " + String(input.world || "") + "\nVISUAL STYLE: " + String(input.style || "") + "\nCHARACTERS: " + JSON.stringify(Array.isArray(input.characters) ? input.characters : []) + "\nEPISODE SUMMARY: " + JSON.stringify(input.episode || {}) + "\nOPENING SCENE: " + JSON.stringify(input.pilot || {}) + "\nBuild the deliverable from this established material. Preserve the supplied opening events and dialogue where appropriate." }
+        ],
+        temperature: 0.8
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "The story creator failed." });
+    const content = String(data.choices?.[0]?.message?.content || "").trim();
+    if (!content) return res.status(502).json({ error: "The AI returned an empty draft." });
+    res.json({ title: title + " · " + formats[format].title, format, content });
+  } catch (error) {
+    console.error("Format creation failed:", error.message);
+    res.status(502).json({ error: "Could not reach the story creator. Your project remains saved. Please try again." });
+  }
+});
+
 app.get("/", (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
