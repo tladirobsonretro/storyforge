@@ -100,7 +100,12 @@
 
       window.storyforgeWorldBible = data.world || "";
       window.storyforgeCharacterBible = (data.characters || []).map((c) => [c.name, c.role].join(" | ")).join(" ; ");
-      notify(data.generationWarning || "Story created successfully.");
+      if (window.storyforgePipeline && window.storyforgePipeline.write) {
+        window.storyforgePipeline.write({title:data.title||"Untitled story",idea:idea,logline:data.logline||"",world:data.world||"",characters:data.characters||[],episodes:data.episodes||[],scenes:data.scenes||[]});
+      }
+      try { localStorage.setItem("storyforge-story-bible", JSON.stringify({world:{name:data.title||"Story world",premise:data.world||"",visualIdentity:"Original project world"},characters:data.characters||[]})); } catch (_) {}
+      if (typeof window.saveProject === "function") window.saveProject();
+      notify(data.generationWarning || "Project created and saved.");
       results?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       notify(error && error.message ? error.message : "Story creation failed. Please try again.");
