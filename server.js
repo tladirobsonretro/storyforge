@@ -114,6 +114,36 @@ app.post("/api/scene", async (req, res) => {
     res.json(parsed);
   } catch (error) { res.status(502).json({error:"Scene generation failed. Please try again."}); }
 });
+app.post("/api/refine-world", async (req, res) => {
+  const title = String(req.body?.title || "Untitled story").trim();
+  const world = String(req.body?.world || "").trim();
+  const changes = String(req.body?.changes || "").trim();
+  if (!world || !changes) return res.status(400).json({ error: "The existing world and requested changes are required." });
+  if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({ error: "World editing requires the AI connection. Please try again when it is available." });
+  try {
+    const response = await fetch("https://gen.pollinations.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + process.env.POLLINATIONS_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai",
+        messages: [
+          { role: "system", content: "You are StoryForge's world editor. Revise an existing fictional world according to the user's requested changes. Preserve the original premise, identity, established facts, and all details not affected by the request. Do not invent a replacement world or start a new concept. Return only the revised world description as plain text, with no preamble or quotation marks." },
+          { role: "user", content: "Story: " + title + "\n\nEXISTING WORLD AND SETTING:\n" + world + "\n\nCHANGES TO APPLY TO THIS SAME WORLD:\n" + changes + "\n\nRevise the existing description with only the requested changes integrated naturally." }
+        ],
+        temperature: 0.5
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || data.error || "World editing failed." });
+    const revised = String(data.choices?.[0]?.message?.content || "").trim().replace(/^```(?:text)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    if (!revised) return res.status(502).json({ error: "The AI returned an empty world description." });
+    res.json({ world: revised });
+  } catch (error) {
+    console.error("StoryForge world editing failed:", error.message);
+    res.status(502).json({ error: "Could not reach the world editor. Your existing world has not been changed." });
+  }
+});
+
 app.post("/api/world", (req, res) => {
   if (!req.body) return res.status(400).json({ error: "World details are required." });
   res.json(buildWorld(req.body));
