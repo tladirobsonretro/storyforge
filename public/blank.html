@@ -4,92 +4,202 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0a0a0a">
-<title>StoryForge · Create anything</title>
+<title>StoryForge · Story Workshop</title>
 <style>
-:root{color-scheme:dark;--bg:#0a0a0a;--line:#292929;--muted:#8a8a8a;--text:#f5f5f5}
+:root{color-scheme:dark;--bg:#0a0a0a;--panel:#101010;--line:#292929;--muted:#929292;--text:#f5f5f5;--soft:#c8c8c8}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-body{min-height:100vh}
-button,textarea{font:inherit}
-.topbar{height:76px;display:flex;align-items:center;padding:0 clamp(20px,5vw,72px);border-bottom:1px solid #191919}
-.brand{display:inline-flex;align-items:center;gap:11px;color:var(--text);font-size:18px;font-weight:650;letter-spacing:-.65px;text-decoration:none}
+body{min-height:100vh}button,input,textarea,select{font:inherit}
+.topbar{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 clamp(18px,5vw,64px);border-bottom:1px solid #1c1c1c}
+.brand{display:inline-flex;align-items:center;gap:11px;color:var(--text);font-size:18px;font-weight:650;letter-spacing:-.65px;text-decoration:none;white-space:nowrap}
 .brand-mark{width:29px;height:29px;border:1.7px solid #f3f3f3;border-radius:50%;display:grid;place-items:center;position:relative}
-.brand-mark:before{content:"";width:9px;height:9px;border:1.5px solid #f3f3f3;border-radius:50%;display:block}
+.brand-mark:before{content:"";width:9px;height:9px;border:1.5px solid #f3f3f3;border-radius:50%}
 .brand-mark:after{content:"";position:absolute;width:5px;height:5px;background:#f3f3f3;border-radius:50%;right:1px;top:2px}
-main{width:min(850px,calc(100% - 36px));margin:0 auto;min-height:calc(100vh - 77px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:62px 0 70px}
-h1{margin:0 0 14px;text-align:center;font-size:clamp(30px,5vw,48px);line-height:1.12;letter-spacing:-1.9px;font-weight:560}
-.subheading{margin:0 0 34px;color:var(--muted);font-size:15px;text-align:center;line-height:1.6}
-.prompt-shell{width:100%;border:1px solid #343434;background:#101010;border-radius:17px;padding:16px;transition:border-color .18s,box-shadow .18s}
-.prompt-shell:focus-within{border-color:#656565;box-shadow:0 0 0 3px #ffffff08}
-textarea{display:block;width:100%;min-height:116px;resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font-size:16px;line-height:1.55;padding:4px 3px}
-textarea::placeholder{color:#666}
-.categories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;margin-top:17px}
-.category{display:flex;align-items:center;justify-content:center;gap:10px;min-height:57px;border:1px solid #272727;background:transparent;color:#dedede;border-radius:12px;cursor:pointer;transition:background .16s,border-color .16s,color .16s}
-.category:hover{background:#141414;border-color:#484848}
+.top-actions{display:flex;gap:9px;align-items:center}
+button{cursor:pointer}
+button:disabled{opacity:.35;cursor:not-allowed}
+.btn{border:1px solid #333;background:#151515;color:#eee;border-radius:9px;padding:10px 14px;font-size:13px;font-weight:600}
+.btn:hover:not(:disabled){border-color:#777;background:#1b1b1b}
+.btn.primary{background:#f4f4f4;color:#111;border-color:#f4f4f4}
+.btn.primary:hover:not(:disabled){background:#fff}
+main{width:min(1060px,calc(100% - 36px));margin:0 auto;padding:54px 0 72px}
+.intro{max-width:740px;margin:0 auto 30px;text-align:center}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#aaa;margin-bottom:15px}
+h1{font-size:clamp(30px,5vw,46px);line-height:1.12;letter-spacing:-1.7px;font-weight:560;margin:0 0 13px}
+.subheading{color:var(--muted);font-size:15px;line-height:1.65;margin:0 auto;max-width:620px}
+.home{max-width:760px;margin:42px auto 0}
+.prompt-shell,.panel{border:1px solid #303030;background:var(--panel);border-radius:15px;padding:18px}
+textarea,input,select{width:100%;border:1px solid #303030;border-radius:9px;background:#0b0b0b;color:var(--text);padding:12px 13px;outline:none;line-height:1.5}
+textarea{resize:vertical;min-height:115px}
+input:focus,textarea:focus,select:focus{border-color:#777}
+textarea::placeholder,input::placeholder{color:#656565}
+.label{display:block;color:#d7d7d7;font-size:13px;font-weight:600;margin:0 0 8px}
+.help{font-size:12px;line-height:1.5;color:#818181;margin:7px 0 0}
+.categories{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:15px}
+.category{min-height:52px;border:1px solid #2c2c2c;border-radius:10px;background:transparent;color:#ddd}
 .category[aria-pressed="true"]{background:#f3f3f3;color:#111;border-color:#f3f3f3}
-.category svg{width:18px;height:18px;flex:none}
-.action-area{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:23px}
-.create{width:min(100%,260px);min-height:48px;border:0;border-radius:11px;background:#f4f4f4;color:#101010;font-weight:650;cursor:pointer;transition:opacity .15s,transform .15s}
-.create:hover:not(:disabled){transform:translateY(-1px);background:#fff}
-.create:disabled{opacity:.35;cursor:not-allowed}
-.notice{min-height:20px;text-align:center;font-size:13px;color:#999}
-@media(max-width:520px){.topbar{height:65px}.brand{font-size:17px}main{padding-top:50px;justify-content:flex-start;margin-top:7vh}.subheading{font-size:14px;margin-bottom:25px}.prompt-shell{padding:12px}textarea{min-height:120px}.categories{gap:8px}.category{min-height:52px;gap:7px;font-size:13px}.action-area{margin-top:20px}.create{width:100%}}
+.action-area{display:flex;flex-direction:column;align-items:center;gap:11px;margin-top:18px}
+.create{width:min(100%,260px);min-height:48px}
+.notice{min-height:18px;text-align:center;font-size:12px;color:#999;line-height:1.5}
+.hidden{display:none!important}
+.workshop-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:22px}
+.workshop-head h1{font-size:clamp(28px,4vw,38px);margin-bottom:10px}
+.status{font-size:12px;color:#aaa;margin-top:10px}
+.section-title{font-size:17px;font-weight:620;letter-spacing:-.3px;margin:0 0 7px}
+.section-copy{font-size:13px;line-height:1.6;color:#929292;margin:0 0 20px}
+.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.field.full{grid-column:1/-1}
+.field textarea{min-height:90px}
+.field textarea.tall{min-height:125px}
+.divider{height:1px;background:#252525;margin:23px 0}
+.section-label{font-size:11px;color:#9a9a9a;text-transform:uppercase;letter-spacing:1.6px;margin-bottom:12px}
+.production-note{border:1px solid #292929;background:#0b0b0b;border-radius:11px;padding:14px 15px;color:#bdbdbd;font-size:13px;line-height:1.6;margin-top:22px}
+.production-note strong{color:#f2f2f2}
+.save-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:22px}
+.saved-list{display:grid;gap:10px;margin-top:20px}
+.saved-item{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #292929;background:#101010;border-radius:11px;padding:14px}
+.saved-title{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.saved-meta{font-size:12px;color:#888;margin-top:5px}
+.saved-actions{display:flex;gap:7px;flex-shrink:0}
+.empty{border:1px dashed #303030;border-radius:12px;padding:24px;text-align:center;color:#888;font-size:13px;line-height:1.6}
+.footer-note{color:#666;font-size:11px;line-height:1.5;margin-top:20px}
+@media(max-width:650px){.topbar{min-height:64px;padding:0 17px}.brand{font-size:17px}.top-actions{gap:6px}.btn{padding:9px 10px;font-size:12px}main{padding-top:37px}.intro{margin-bottom:22px}.home{margin-top:25px}.field-grid{grid-template-columns:1fr;gap:15px}.field.full{grid-column:auto}.workshop-head{display:block}.workshop-head>.btn{margin-top:12px}.save-row{align-items:stretch;flex-direction:column}.save-row .btn{width:100%}.saved-item{align-items:flex-start;flex-direction:column}.saved-actions{width:100%}.saved-actions .btn{flex:1}.categories{gap:7px}.category{font-size:13px}}
 </style>
 </head>
 <body>
 <header class="topbar">
-  <a class="brand" href="/" aria-label="StoryForge home">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <span>StoryForge</span>
-  </a>
+  <a class="brand" href="/" id="brandHome" aria-label="StoryForge home"><span class="brand-mark" aria-hidden="true"></span><span>StoryForge</span></a>
+  <div class="top-actions"><button class="btn" id="projectsButton" type="button">My projects</button></div>
 </header>
 <main>
-  <h1>What do you want to create today?</h1>
-  <p class="subheading">Bring the idea. We'll build from there.</p>
-  <div class="prompt-shell">
-    <textarea id="prompt" aria-label="Describe what you want to create" placeholder="Describe what you have in mind..." maxlength="10000"></textarea>
-  </div>
-  <div class="categories" role="group" aria-label="Choose a creation type">
-    <button class="category" type="button" data-type="Video" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="13" height="14" rx="2"></rect><path d="m16 10 5-3v10l-5-3"></path></svg>
-      <span>Video</span>
-    </button>
-    <button class="category" type="button" data-type="Audio" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
-      <span>Audio</span>
-    </button>
-    <button class="category" type="button" data-type="Image" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="m21 15-5-5L5 21"></path></svg>
-      <span>Image</span>
-    </button>
-  </div>
-  <div class="action-area">
-    <button class="create" id="createButton" type="button" disabled>Create <span aria-hidden="true">↗</span></button>
-    <div class="notice" id="notice" role="status" aria-live="polite">Describe your idea and choose a format to begin.</div>
-  </div>
+  <section id="homeView">
+    <div class="intro"><div class="eyebrow">Story development · Step 1</div><h1>Start with the story.</h1><p class="subheading">Build the foundation of your series before you plan episodes or make a single frame.</p></div>
+    <div class="home">
+      <div class="prompt-shell">
+        <label class="label" for="idea">What story do you want to make?</label>
+        <textarea id="idea" maxlength="10000" placeholder="Describe the series you have in mind. Who or what is it about? What makes it interesting? It is fine if you only have a rough idea."></textarea>
+        <p class="help">Start with what you know. You can develop the details in the workshop.</p>
+      </div>
+      <div class="categories" role="group" aria-label="Choose a project format">
+        <button class="category" type="button" data-type="Video" aria-pressed="true">Video series</button>
+        <button class="category" type="button" data-type="Audio" aria-pressed="false">Audio series</button>
+        <button class="category" type="button" data-type="Image" aria-pressed="false">Visual concept</button>
+      </div>
+      <div class="action-area"><button class="btn primary create" id="createButton" type="button" disabled>Open Story Workshop ↗</button><div class="notice" id="homeNotice" role="status" aria-live="polite">Add your idea to begin. Nothing will be generated or charged here.</div></div>
+    </div>
+  </section>
+
+  <section id="workshopView" class="hidden">
+    <div class="workshop-head">
+      <div><div class="eyebrow">Story Workshop · Step 1 of the series Bible</div><h1 id="workshopHeading">Your series foundation</h1><p class="subheading" style="text-align:left">This is your working brief. Shape the idea, setting, characters and central conflict. Unanswered questions can stay open until you are ready.</p><div class="status" id="saveStatus" aria-live="polite">Not saved yet</div></div>
+      <button class="btn" id="backButton" type="button">← Back to start</button>
+    </div>
+    <div class="panel">
+      <div class="section-title">The concept</div><p class="section-copy">Define what the series is and why an audience would keep watching.</p>
+      <div class="field-grid">
+        <div class="field"><label class="label" for="seriesTitle">Working title</label><input id="seriesTitle" placeholder="A title can change later"></div>
+        <div class="field"><label class="label" for="format">Format</label><select id="format"><option>Animated series</option><option>Live-action series</option><option>Mixed media</option><option>Not decided yet</option></select></div>
+        <div class="field"><label class="label" for="genre">Genre</label><input id="genre" placeholder="e.g. mystery, fantasy, comedy"></div>
+        <div class="field"><label class="label" for="audience">Intended audience</label><input id="audience" placeholder="e.g. family, teens, adults"></div>
+        <div class="field full"><label class="label" for="premise">Core idea / premise</label><textarea id="premise" class="tall" placeholder="What is the series about? Keep your original idea here, then refine it."></textarea></div>
+        <div class="field full"><label class="label" for="hook">What makes it distinctive?</label><textarea id="hook" placeholder="What is the fresh angle, emotional promise or question that makes this series yours?"></textarea></div>
+      </div>
+      <div class="divider"></div>
+      <div class="section-title">The story world</div><p class="section-copy">Establish where the story happens and what makes that place matter.</p>
+      <div class="field-grid">
+        <div class="field full"><label class="label" for="setting">Setting and time</label><textarea id="setting" placeholder="Where and when does it happen? A real place, an imagined world, the present, the future, or something else?"></textarea></div>
+        <div class="field"><label class="label" for="worldRules">Important world rules</label><textarea id="worldRules" placeholder="What can or cannot happen in this world? Leave open if undecided."></textarea></div>
+        <div class="field"><label class="label" for="tone">Tone and feeling</label><textarea id="tone" placeholder="How should it feel to watch? e.g. tense, funny, hopeful, eerie"></textarea></div>
+      </div>
+      <div class="divider"></div>
+      <div class="section-title">The people at the heart of it</div><p class="section-copy">Characters are more than names. Capture what they want and what stands in their way. These are first notes, not final character profiles.</p>
+      <div class="field-grid">
+        <div class="field"><label class="label" for="protagonist">Protagonist</label><textarea id="protagonist" placeholder="Who is the central character? What do they want, and what makes that difficult?"></textarea></div>
+        <div class="field"><label class="label" for="antagonist">Antagonist or opposing force</label><textarea id="antagonist" placeholder="Who or what opposes the protagonist? It can be a person, a system, nature or an inner struggle."></textarea></div>
+        <div class="field full"><label class="label" for="relationships">Key relationships or supporting characters</label><textarea id="relationships" placeholder="Who helps, challenges, tempts or complicates the protagonist's journey?"></textarea></div>
+      </div>
+      <div class="divider"></div>
+      <div class="section-title">The series engine</div><p class="section-copy">A series needs a reason for another episode to exist, beyond the first idea.</p>
+      <div class="field-grid">
+        <div class="field full"><label class="label" for="conflict">Central conflict</label><textarea id="conflict" placeholder="What problem, mystery or struggle drives the story forward?"></textarea></div>
+        <div class="field full"><label class="label" for="engine">What keeps generating episodes?</label><textarea id="engine" placeholder="What new challenge, discovery, mission or consequence can keep the story moving from episode to episode?"></textarea></div>
+        <div class="field"><label class="label" for="seasonDestination">Where could season one lead?</label><textarea id="seasonDestination" placeholder="What changes by the end of the season? A rough direction is enough."></textarea></div>
+        <div class="field"><label class="label" for="cliffhanger">Finale or cliffhanger idea</label><textarea id="cliffhanger" placeholder="What revelation, danger or unanswered question could make viewers want the next season?"></textarea></div>
+      </div>
+      <div class="production-note"><strong>Production target (editable later):</strong> Plan the story first, then break episodes into manageable shots. For a 20-minute episode, 30-second clips would mean about <strong>40 clips</strong>. This is a planning estimate, not a promise that AI can generate every clip consistently.</div>
+      <div class="save-row"><button class="btn" id="saveAndHome" type="button">Save project</button><button class="btn primary" id="saveProjectButton" type="button">Save series foundation ✓</button></div>
+      <p class="footer-note">This first workshop uses your browser to save projects on this device. It does not call an AI, image or video generation service. Saved projects are not yet synced between devices.</p>
+    </div>
+  </section>
+
+  <section id="projectsView" class="hidden">
+    <div class="workshop-head"><div><div class="eyebrow">Your workspace</div><h1>Your projects</h1><p class="subheading" style="text-align:left">Open a saved series foundation and continue developing it.</p></div><button class="btn" id="newProjectButton" type="button">+ New project</button></div>
+    <div id="savedProjects" class="saved-list"></div>
+    <p class="footer-note">Projects are saved in this browser on this device.</p>
+  </section>
 </main>
 <script>
 (function(){
-  const prompt=document.getElementById('prompt');
-  const createButton=document.getElementById('createButton');
-  const notice=document.getElementById('notice');
-  const categories=[...document.querySelectorAll('.category')];
-  let selectedType='';
-  function updateButton(){createButton.disabled=!prompt.value.trim()||!selectedType;}
-  prompt.addEventListener('input',function(){updateButton();notice.textContent='';});
-  categories.forEach(function(button){
-    button.addEventListener('click',function(){
-      selectedType=button.dataset.type;
-      categories.forEach(function(item){item.setAttribute('aria-pressed',String(item===button));});
-      updateButton();
-      notice.textContent=selectedType+' selected.';
-    });
-  });
-  createButton.addEventListener('click',function(){
-    if(!prompt.value.trim()){prompt.focus();notice.textContent='Describe what you want to create first.';return;}
-    if(!selectedType){notice.textContent='Choose Video, Audio or Image to continue.';return;}
-    notice.textContent=selectedType+' is selected. This creation flow will be built next.';
-  });
+ const $=id=>document.getElementById(id);
+ const keys={projects:'storyforge-workshop-projects-v1',active:'storyforge-workshop-active-v1'};
+ const fields=['seriesTitle','format','genre','audience','premise','hook','setting','worldRules','tone','protagonist','antagonist','relationships','conflict','engine','seasonDestination','cliffhanger'];
+ let selectedType='Video',activeId=null;
+ function readProjects(){try{const p=JSON.parse(localStorage.getItem(keys.projects)||'[]');return Array.isArray(p)?p:[]}catch(e){return []}}
+ function writeProjects(p){localStorage.setItem(keys.projects,JSON.stringify(p))}
+ function show(view){['homeView','workshopView','projectsView'].forEach(id=>$(id).classList.toggle('hidden',id!==view));window.scrollTo({top:0,behavior:'instant'})}
+ function updateCreate(){ $('createButton').disabled=!$('idea').value.trim() }
+ function newProject(){
+  activeId=null;fields.forEach(id=>{if(id==='format')$(id).value='Animated series';else $(id).value=''});
+  $('premise').value=$('idea').value.trim();
+  const raw=$('idea').value.trim().replace(/\s+/g,' ');
+  $('seriesTitle').value=raw?(raw.length>52?raw.slice(0,49).replace(/\s+\S*$/,'')+'…':raw):'';
+  $('saveStatus').textContent='Not saved yet';
+  $('workshopHeading').textContent='Your series foundation';
+  show('workshopView');
+ }
+ function collect(){
+  const data={};fields.forEach(id=>data[id]=$(id).value);
+  data.id=activeId||('sf-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7));
+  data.projectType=selectedType;data.updatedAt=new Date().toISOString();
+  data.createdAt=(readProjects().find(p=>p.id===data.id)||{}).createdAt||data.updatedAt;
+  return data;
+ }
+ function saveProject(){
+  const data=collect();
+  if(!data.seriesTitle.trim()&&!data.premise.trim()){ $('saveStatus').textContent='Add a working title or premise before saving.';return }
+  const projects=readProjects();const index=projects.findIndex(p=>p.id===data.id);
+  if(index>=0)projects[index]=data;else projects.unshift(data);
+  try{writeProjects(projects);activeId=data.id;localStorage.setItem(keys.active,activeId);$('saveStatus').textContent='Saved in this browser · '+new Date(data.updatedAt).toLocaleString();$('workshopHeading').textContent=data.seriesTitle||'Untitled series';}
+  catch(e){$('saveStatus').textContent='Could not save. Browser storage may be full or disabled.'}
+ }
+ function openProject(id){
+  const p=readProjects().find(x=>x.id===id);if(!p)return;
+  activeId=p.id;selectedType=p.projectType||'Video';fields.forEach(key=>{if($(key))$(key).value=p[key]|| (key==='format'?'Animated series':'')});
+  $('saveStatus').textContent='Saved in this browser · '+new Date(p.updatedAt||p.createdAt).toLocaleString();
+  $('workshopHeading').textContent=p.seriesTitle||'Untitled series';localStorage.setItem(keys.active,activeId);show('workshopView');
+ }
+ function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+ function renderProjects(){
+  const projects=readProjects(),root=$('savedProjects');
+  if(!projects.length){root.innerHTML='<div class="empty">No saved projects yet.<br>Start with an idea and save your first series foundation.</div>';return}
+  root.innerHTML=projects.map(p=>'<div class="saved-item"><div><div class="saved-title">'+escapeHtml(p.seriesTitle||'Untitled series')+'</div><div class="saved-meta">'+escapeHtml(p.projectType||'Video')+' · Updated '+escapeHtml(new Date(p.updatedAt||p.createdAt).toLocaleDateString())+'</div></div><div class="saved-actions"><button class="btn primary" data-open="'+escapeHtml(p.id)+'">Open</button><button class="btn" data-delete="'+escapeHtml(p.id)+'">Delete</button></div></div>').join('');
+ }
+ $('idea').addEventListener('input',updateCreate);
+ document.querySelectorAll('.category').forEach(btn=>btn.addEventListener('click',()=>{selectedType=btn.dataset.type;document.querySelectorAll('.category').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));$('homeNotice').textContent=selectedType+' selected. No media will be generated in this step.'}));
+ $('createButton').addEventListener('click',()=>{if(!$('idea').value.trim())return;newProject()});
+ $('projectsButton').addEventListener('click',()=>{renderProjects();show('projectsView')});
+ $('brandHome').addEventListener('click',e=>{e.preventDefault();show('homeView')});
+ $('backButton').addEventListener('click',()=>show('homeView'));
+ $('saveProjectButton').addEventListener('click',saveProject);
+ $('saveAndHome').addEventListener('click',()=>{saveProject();if(activeId)show('projectsView'),renderProjects()});
+ $('newProjectButton').addEventListener('click',()=>{show('homeView');$('idea').value='';selectedType='Video';document.querySelectorAll('.category').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.type===selectedType)));updateCreate()});
+ $('savedProjects').addEventListener('click',e=>{
+  const open=e.target.closest('[data-open]');if(open){openProject(open.dataset.open);return}
+  const del=e.target.closest('[data-delete]');if(del&&confirm('Delete this saved project? This cannot be undone.')){writeProjects(readProjects().filter(p=>p.id!==del.dataset.delete));renderProjects()}
+ });
+ fields.forEach(id=>$(id).addEventListener('input',()=>{if(activeId)$('saveStatus').textContent='Unsaved changes · save to keep your edits'}));
+ const last=localStorage.getItem(keys.active);if(last&&readProjects().some(p=>p.id===last)){/* leave the start screen clean; projects remain available under My projects */}
+ updateCreate();
 })();
 </script>
 </body>
