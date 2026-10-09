@@ -1,18 +1,22 @@
 (() => {
+  const STYLE_LOCK = "Original painterly cinematic stylized animation; expressive hand-designed character shapes, hand-painted textures, graphic shadows, dramatic illustrated lighting, rich atmospheric depth, controlled colour palette and premium animated-series composition. Distinctly South African retro-futurism. STRICTLY ANIMATED, NOT PHOTOREALISTIC, NOT HYPERREALISTIC, NOT LIVE-ACTION, NOT PHOTOGRAPHIC. Original visual identity, do not copy an existing show or artist.";
   let currentShots = [];
   let animatedClips = {};
   let generatedFrames = {};
   try { window.storyforgeCharacterReferenceImage = window.storyforgeCharacterReferenceImage || localStorage.getItem("storyforge-character-reference") || null; } catch (e) {}
 
   window.buildStoryboard = async function () {
+    const production = window.storyforgePipeline ? window.storyforgePipeline.read() : {};
+    const scene = window.storyforgeScene || production.scene || null;
     const payload = {
-      title: document.getElementById("boardTitle").value,
-      episode: document.getElementById("boardEpisode").value,
-      episodeTitle: document.getElementById("boardEpisodeTitle").value,
-      premise: document.getElementById("boardPremise").value,
-      scene: window.storyforgeScene || null,
-      worldBible: window.storyforgeWorldBible || "",
-      characterBible: window.storyforgeCharacterBible || ""
+      title: document.getElementById("boardTitle").value || production.title || "Untitled Story",
+      episode: document.getElementById("boardEpisode").value || production.episode?.number || 1,
+      episodeTitle: document.getElementById("boardEpisodeTitle").value || production.episode?.title || "The March",
+      premise: document.getElementById("boardPremise").value || scene?.premise || scene?.action || production.idea || "",
+      scene,
+      worldBible: window.storyforgeWorldBible || (production.world ? JSON.stringify(production.world) : ""),
+      characterBible: window.storyforgeCharacterBible || (window.storyforgePipeline ? window.storyforgePipeline.charactersText() : ""),
+      visualStyle: window.storyforgeVisualStyle || production.visualStyle || STYLE_LOCK
     };
     const response = await fetch("/api/storyboard", {
       method: "POST",
@@ -25,7 +29,7 @@
       return;
     }
 
-    currentShots = data.shots || [];
+    currentShots = (data.shots || []).map(shot => ({...shot, visualPrompt: [STYLE_LOCK, shot.visualPrompt || "", "WORLD CONTEXT: "+payload.worldBible, "CHARACTER CONTINUITY: "+payload.characterBible, "SCENE ACTION: "+(shot.action||payload.premise), "Strictly painterly stylized animation, no photorealism, no hyperrealism, no live action."].filter(Boolean).join("\n")}));
     animatedClips = {};
     generatedFrames = {};
     const output = document.getElementById("toolOutput");
@@ -70,8 +74,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: shot.visualPrompt + "; " + shot.action + "; " + shot.camera +
-              "; original cinematic story frame; consistent characters, location and visual identity",
+            prompt: STYLE_LOCK + "\nPROJECT WORLD: " + (window.storyforgeWorldBible || "") + "\nPROJECT CHARACTERS: " + (window.storyforgeCharacterBible || "") + "\nSHOT ACTION: " + shot.action + "\nCAMERA: " + shot.camera + "\n" + shot.visualPrompt + "\nKeep the exact stylized animated art direction. Do not render as a photograph, live-action film or hyperrealistic 3D.",
             size: "1024x1024",
             referenceImage: window.storyforgeCharacterReferenceImage || null
           })
@@ -109,7 +112,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: shot.visualPrompt + "; " + shot.action + "; " + shot.camera + "; preserve the exact character and environment shown in the reference frame; smooth cinematic motion",
+          prompt: STYLE_LOCK + "\nPROJECT WORLD: " + (window.storyforgeWorldBible || "") + "\nPROJECT CHARACTERS: " + (window.storyforgeCharacterBible || "") + "\n" + shot.visualPrompt + "; " + shot.action + "; " + shot.camera + "; preserve the exact stylized character and environment shown in the reference frame; smooth cinematic animated motion; never photorealistic or live action",
           image: frame.src,
           referenceImages: window.storyforgeCharacterReferenceImage ? [window.storyforgeCharacterReferenceImage] : [],
           model: "alibaba/wan-2.2-fast",
@@ -172,7 +175,8 @@
 
   function persistProductionState() {
     try {
-      localStorage.setItem("storyforge-production-state", JSON.stringify({shots:currentShots,frames:generatedFrames,clips:animatedClips,scene:window.storyforgeScene||null,characterReferenceImage:window.storyforgeCharacterReferenceImage||null}));
+      localStorage.setItem("storyforge-production-state", JSON.stringify({shots:currentShots,frames:generatedFrames,clips:animatedClips,scene:window.storyforgeScene||null,characterReferenceImage:window.storyforgeCharacterReferenceImage||null,world:window.storyforgeWorldBible||"",characters:window.storyforgeCharacterBible||"",visualStyle:window.storyforgeVisualStyle||STYLE_LOCK}));
+      if(window.storyforgePipeline)window.storyforgePipeline.write({storyboard:{shots:currentShots,scene:window.storyforgeScene||null},world:window.storyforgeWorldBible||"",characters:window.storyforgeCharacterBible||"",visualStyle:window.storyforgeVisualStyle||STYLE_LOCK});
     } catch (e) {}
   }
   window.renderRestoredProduction = function () {
