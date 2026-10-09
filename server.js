@@ -14,7 +14,7 @@ const videoClipFiles = new Map();
 fs.mkdirSync(videoReferenceDir, { recursive: true });
 
 app.use(express.json({ limit: "50mb" }));
-app.use(express.static("public"));
+app.use(express.static("public", { index: false }));
 
 function buildStory(idea) {
   const clean = idea.trim().replace(/\s+/g, " ");
