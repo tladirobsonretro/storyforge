@@ -280,7 +280,7 @@
     });
     $("sfProduce").addEventListener("click", produceVideo);
     $("sfSceneList").addEventListener("input", event => {
-      const match = event.target.id.match(/^sfPrompt(\\d+)$/);
+      const match = event.target.id.match(/^sfPrompt(\d+)$/);
       if (!match) return;
       const index = Number(match[1]);
       if (scenes[index]) { scenes[index].videoPrompt = event.target.value; saveBreakdown(); }
