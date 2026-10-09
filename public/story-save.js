@@ -1,20 +1,7 @@
-(() => {
 "use strict";
-const KEY="storyforge-projects";
-function toast(m){const e=document.getElementById("toast");if(e){e.textContent=m;e.style.display="block"}else alert(m)}
-function saved(){const a=JSON.parse(localStorage.getItem(KEY)||"[]");if(!Array.isArray(a))throw Error("Saved projects data is invalid.");return a}
-function openStory(p){
- const d=p.data||{}, byId=id=>document.getElementById(id), set=(id,v)=>{byId(id).textContent=v||""};
- set("resultTitle",d.title||p.title);set("logline",d.logline);
- const w=d.world;set("world",typeof w==="string"?w:w?JSON.stringify(w,null,2):"");
- const render=(id,items,kind)=>{const root=byId(id);root.replaceChildren();(Array.isArray(items)?items:[]).forEach((x,i)=>{const row=document.createElement("div");row.className=kind;const h=document.createElement(kind==="shot"?"b":"strong");h.textContent=kind==="shot"?"SHOT "+(x.shot||i+1):(x.number?x.number+". ":"")+ (x.name||x.title||"");const detail=document.createElement(kind==="shot"?"div":"span");detail.textContent=kind==="shot"?(x.camera||x.shotType||"")+" "+(x.action||""):(x.role||x.summary||"");row.append(h,detail);root.appendChild(row)})};
- render("characters",d.characters,"episode");render("episodes",d.episodes,"episode");render("shots",d.scenes,"shot");
- byId("results").classList.add("show");byId("results").scrollIntoView({behavior:"smooth",block:"start"});toast("Saved story opened.")
-}
-function refresh(a){const c=document.getElementById("projectCount"),list=document.getElementById("projects");if(c)c.textContent=a.length+" saved locally in this browser";if(!list)return;list.replaceChildren();a.forEach(p=>{const row=document.createElement("div");row.className="project";row.style.cursor="pointer";row.tabIndex=0;const d=document.createElement("div"),h=document.createElement("strong"),s=document.createElement("small"),status=document.createElement("span");h.textContent=p.title||"Untitled story";s.textContent=p.idea||"";status.className="status";status.textContent="OPEN";d.append(h,s);row.append(d,status);row.onclick=()=>openStory(p);row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openStory(p)}};list.appendChild(row)});const pipe=document.createElement("div");pipe.className="project";pipe.textContent="StoryForge pipeline · World → Character → Story → Asset → Storyboard → Video";list.appendChild(pipe)}
-function save(e){e.preventDefault();e.stopImmediatePropagation();const q=id=>document.getElementById(id),title=q("resultTitle")?.textContent?.trim();if(!title){toast("Create a story before saving it.");return}
- const data={title,logline:q("logline")?.textContent||"",world:q("world")?.textContent||"",characters:[...(q("characters")?.children||[])].map(x=>({name:x.querySelector("strong")?.textContent||"",role:x.querySelector("span")?.textContent||""})),episodes:[...(q("episodes")?.children||[])].map((x,i)=>({number:i+1,title:x.querySelector("strong")?.textContent?.replace(/^\d+\.\s*/,"")||"",summary:x.querySelector("span")?.textContent||""})),scenes:[...(q("shots")?.children||[])].map((x,i)=>({shot:x.querySelector("b")?.textContent?.replace(/^SHOT\s*/,"")||String(i+1),camera:x.querySelector("div")?.textContent||"",action:[...x.querySelectorAll("div")].slice(1).map(v=>v.textContent).join(" ")}))};
- try{const p={id:Date.now(),title,idea:q("idea")?.value?.trim()||title,data};const a=[p,...saved()].slice(0,20);localStorage.setItem(KEY,JSON.stringify(a));const check=saved();if(!check.some(x=>x.id===p.id))throw Error("Save could not be verified");refresh(check);toast("Project saved on this device.")}catch(err){toast("Save failed: "+(err.message||"browser storage unavailable"))}}
-document.addEventListener("click",e=>{if(e.target.closest&&e.target.closest("#saveProjectButton"))save(e)},true);
-document.addEventListener("DOMContentLoaded",()=>{try{refresh(saved())}catch(e){toast("Could not read saved projects: "+e.message)}});
-})();
+// The main StoryForge workspace owns project creation, deduplication and rendering.
+// Keep this compatibility file lightweight so it cannot overwrite the project list
+// or add a fake "pipeline" card after the dashboard has rendered.
+document.addEventListener("DOMContentLoaded", function () {
+  if (typeof window.renderProjects === "function") window.renderProjects();
+});
