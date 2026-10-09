@@ -219,6 +219,34 @@ app.post("/api/storyboard", async (req, res) => {
     res.json({...parsed,status:"AI_STORYBOARD_READY"});
   } catch(error) { res.json({...buildStoryboard(input),status:"TEMPLATE_FALLBACK"}); }
 });
+function buildVideoPlan(input) {
+  const title = String(input.title || "Untitled Video").trim();
+  const format = String(input.format || "short").trim().toLowerCase();
+  const shots = Math.max(1, Math.min(100, parseInt(input.shots, 10) || (Array.isArray(input.storyboard) && input.storyboard.length) || 8));
+  const duration = Math.max(1, Math.min(3600, parseInt(input.duration, 10) || 30));
+  const captions = input.captions !== false;
+  const aspectRatio = format === "landscape" || format === "youtube" || format === "16:9" ? "16:9" :
+    format === "square" || format === "1:1" ? "1:1" : "9:16";
+  const storyboard = Array.isArray(input.storyboard) ? input.storyboard : [];
+  const renderPlan = [
+    "Lock project title, format and visual continuity",
+    "Organise " + shots + " shots across approximately " + duration + " seconds",
+    "Use saved storyboard shots and preserve character, world and scene continuity",
+    captions ? "Prepare readable captions and check safe margins" : "Keep captions disabled",
+    "Balance dialogue, sound effects and music",
+    "Render and review the final cut for pacing, continuity and export quality"
+  ];
+  if (input.world) renderPlan.splice(1, 0, "Apply the saved world bible to locations, lighting and visual language");
+  if (input.characters) renderPlan.splice(2, 0, "Apply the saved character bible to identity, wardrobe and proportions");
+  if (storyboard.length) renderPlan.splice(3, 0, "Use " + storyboard.length + " saved storyboard entries as the shot reference");
+  return {
+    title, format, aspectRatio, shots, duration, captions,
+    audio: "Dialogue clarity, environmental sound, sound effects and a balanced music bed",
+    status: "READY",
+    renderPlan
+  };
+}
+
 app.post("/api/video-plan", (req, res) => {
   if (!req.body) return res.status(400).json({ error: "Video details are required." });
   res.json(buildVideoPlan(req.body));
