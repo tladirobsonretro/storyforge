@@ -38,15 +38,42 @@
   function setView(id) { view(id); }
   function dataForEpisode() {
     const map = (()=>{try{return JSON.parse($("episodeBlueprints").value||"{}")}catch(e){return {}}})();
-    const n = $("prodEpisode").value || "1", e = map[n] || {};
-    return {number:n,title:e.episodeTitle||("Episode "+n),purpose:e.episodePurpose||"",opening:e.episodeOpening||"",turn:e.episodeTurn||"",beats:e.episodeBeats||"",ending:e.episodeEnding||"",character:e.episodeCharacterBeat||"",visuals:e.episodeVisuals||"",continuity:e.episodeContinuity||""};
+    const n = String($("prodEpisode").value || "1");
+    const selected = map[n] && typeof map[n] === "object" ? map[n] : {};
+    // Deliberately read only this episode's blueprint fields. Never use the season arc,
+    // season episode list, or other episode blueprints as scene premises.
+    return {
+      number:n,
+      title:String(selected.episodeTitle||("Episode "+n)).trim(),
+      purpose:String(selected.episodePurpose||"").trim(),
+      opening:String(selected.episodeOpening||"").trim(),
+      turn:String(selected.episodeTurn||"").trim(),
+      beats:String(selected.episodeBeats||"").trim(),
+      ending:String(selected.episodeEnding||"").trim(),
+      character:String(selected.episodeCharacterBeat||"").trim(),
+      visuals:String(selected.episodeVisuals||"").trim(),
+      continuity:String(selected.episodeContinuity||"").trim()
+    };
   }
   const world = () => [$("bibleWorld")?.value,$("setting")?.value,$("worldRules")?.value,$("bibleRules")?.value,$("bibleLocations")?.value].filter(Boolean).join("\n");
   const chars = () => [$("protagonist")?.value,$("antagonist")?.value,$("relationships")?.value,$("bibleCharacterLook")?.value,$("bibleCharacterVoice")?.value].filter(Boolean).join("\n");
   async function post(url,body) { const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw new Error(d.error||("Request failed ("+r.status+")"));return d; }
   function stage(n,state) { const el=$("prodStage"+n);if(el){el.style.borderColor=state==="done"?"#aaa":state==="active"?"#777":"#292929";} }
   function progress(p,msg) {$("prodBar").style.width=Math.round(p*100)+"%";$("prodProgress").textContent=msg;$("prodStatus").textContent=msg;}
-  function sceneList(ep,count) { const raw=(ep.beats||"").split(/\n+/).map(x=>x.replace(/^\s*(?:\d+[.)-]|[-•])\s*/,"").trim()).filter(Boolean);const arr=[ep.opening,...raw,ep.turn,ep.ending].filter(Boolean);while(arr.length<count)arr.push(ep.purpose||"A new discovery complicates the hero's goal.");return arr.slice(0,count); }
+  function sceneList(ep,count) {
+    // Build the shot list from the selected episode only, with a clear episode boundary.
+    const raw=(ep.beats||"").split(/\n+/)
+      .map(x=>x.replace(/^\s*(?:\d+[.)-]|[-•])\s*/,"").trim())
+      .filter(Boolean);
+    const unique=[];
+    [ep.opening,...raw,ep.turn,ep.ending].filter(Boolean).forEach(item=>{
+      const text=String(item).trim();
+      if(text && !unique.some(existing=>existing.toLowerCase()===text.toLowerCase())) unique.push(text);
+    });
+    const arr=unique.slice(0,count);
+    while(arr.length<count) arr.push(ep.purpose||("A new discovery complicates the goal in Episode "+ep.number+"."));
+    return arr;
+  }
   function promptFor(s,ep,i) { return 'Stylized animated scene '+(i+1)+' for "'+($("seriesTitle").value||"Untitled series")+'", episode '+ep.number+': '+ep.title+'. Scene: '+(s.action||s.premise||s.title)+'. World: '+world()+'. Characters: '+chars()+'. Visual direction: '+(ep.visuals||$("bibleVisualStyle")?.value||$("tone")?.value||"cinematic stylized animation")+'. Continuity: '+(ep.continuity||$("bibleContinuity")?.value||"Keep faces, clothing, props and locations consistent.")+'. Vertical 9:16, no photorealism, no live action, no logos or text.'; }
   function renderScenes() {
     const root=$("prodScenes");if(!scenes.length){root.innerHTML='<div class="empty">No scene breakdown yet.</div>';return;}
@@ -56,12 +83,12 @@
     if(busy)return;busy=true;$("prodStart").disabled=true;clips=[];scenes=[];const ep=dataForEpisode(),runtime=Number($("prodRuntime").value)||30,count=runtime===30?4:runtime===60?6:8,duration=Math.max(2,Math.min(15,Math.floor(runtime/count)));const premises=sceneList(ep,count);
     for(let n=1;n<=4;n++)stage(n,"");
     try {
-      stage(1,"active");progress(.02,"Breaking the episode into scenes…");
-      for(let i=0;i<count;i++){const s=await post("/api/scene",{premise:premises[i]||ep.title,world:world(),characters:chars()});scenes.push({...s,number:i+1,premise:premises[i]});progress(.12*(i+1)/count,"Scene "+(i+1)+" of "+count+" mapped…");}
+      stage(1,"active");progress(.02,"Breaking down Episode "+ep.number+" only: "+ep.title+"…");
+      for(let i=0;i<count;i++){const s=await post("/api/scene",{premise:premises[i]||ep.title,world:world(),characters:chars()});scenes.push({...s,number:i+1,premise:premises[i]});progress(.12*(i+1)/count,"Episode "+ep.number+" · scene "+(i+1)+" of "+count+" mapped…");}
       stage(1,"done");stage(2,"active");progress(.15,"Preparing storyboard and continuity assets…");
       const style=$("bibleVisualStyle")?.value||$("tone")?.value||"original stylized animation";
       const assets=await Promise.all([post("/api/asset",{type:"character",subject:chars()||"main character",style,notes:ep.continuity}),post("/api/asset",{type:"environment",subject:world()||"series world",style,notes:ep.continuity})]);
-      for(let i=0;i<scenes.length;i++){scenes[i].storyboard=await post("/api/storyboard",{title:$("seriesTitle").value||"Untitled series",episode:Number(ep.number),episodeTitle:ep.title,premise:scenes[i].premise,scene:scenes[i],worldBible:world(),characterBible:chars(),visualStyle:style});scenes[i].assetPrompts=assets.map(a=>a.prompt);scenes[i].videoPrompt=promptFor(scenes[i],ep,i);progress(.15+.2*(i+1)/count,"Storyboard "+(i+1)+" of "+count+" ready…");}
+      for(let i=0;i<scenes.length;i++){scenes[i].storyboard=await post("/api/storyboard",{title:$("seriesTitle").value||"Untitled series",episode:Number(ep.number),episodeTitle:ep.title,premise:scenes[i].premise,scene:scenes[i],worldBible:world(),characterBible:chars(),visualStyle:style});scenes[i].assetPrompts=assets.map(a=>a.prompt);scenes[i].videoPrompt=promptFor(scenes[i],ep,i);progress(.15+.2*(i+1)/count,"Episode "+ep.number+" · storyboard "+(i+1)+" of "+count+" ready…");}
       stage(2,"done");stage(3,"active");progress(.4,"Generating video clips. This can take a few minutes…");
       for(let i=0;i<scenes.length;i++){try{const clip=await post("/api/video",{prompt:scenes[i].videoPrompt,model:"alibaba/wan-2.2-fast",duration,aspectRatio:"9:16",audio:true});if(!clip.url)throw new Error("No video returned.");scenes[i].clipUrl=clip.url;clips[i]=clip.url;}catch(e){scenes[i].clipError=e.message;renderScenes();throw new Error("Scene "+(i+1)+" failed: "+e.message+" Your scene plan is kept. Retry that scene in Edit & Export.");}progress(.4+.58*(i+1)/count,"Video clip "+(i+1)+" of "+count+" ready…");}
       stage(3,"done");stage(4,"done");progress(1,"Episode ready for editing.");$("exportTitle").textContent="Episode "+ep.number+": "+ep.title;$("exportStatus").textContent=count+" clips ready.";renderScenes();setView("exportView");
