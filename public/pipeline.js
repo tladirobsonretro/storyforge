@@ -58,7 +58,7 @@
   function saveStoryFromPage() {
     const title=val("resultTitle") || val("boardTitle") || val("videoTitle");
     const episodeRows=[...(byId("episodes")?.children||[])];
-    const episodes=episodeRows.map((row,i)=>({number:i+1,title:row.querySelector("strong")?.textContent?.replace(/^\\d+\\.\\s*/,"")||"Episode "+(i+1),summary:row.querySelector("span")?.textContent||""})).filter(e=>e.title);
+    const episodes=episodeRows.map((row,i)=>({number:i+1,title:row.querySelector("strong")?.textContent?.replace(/^[0-9]+[.] /,"")||"Episode "+(i+1),summary:row.querySelector("span")?.textContent||""})).filter(e=>e.title);
     if(title) write({title,idea:val("idea")||read().idea||"",logline:byId("logline")?.textContent||read().logline||"",episodes:episodes.length?episodes:read().episodes||[],world:byId("world")?.textContent||read().world||""});
   }
   function bootstrapSavedStory() {
