@@ -523,6 +523,7 @@ app.post("/api/create-format", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "blank.html"));
   res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
