@@ -103,9 +103,39 @@
       if (window.storyforgePipeline && window.storyforgePipeline.write) {
         window.storyforgePipeline.write({title:data.title||"Untitled story",idea:idea,logline:data.logline||"",world:data.world||"",characters:data.characters||[],episodes:data.episodes||[],scenes:data.scenes||[]});
       }
-      try { localStorage.setItem("storyforge-story-bible", JSON.stringify({world:null,characters:[]})); } catch (_) {}
-      if (typeof window.saveProject === "function") window.saveProject();
-      notify(data.generationWarning || "Project created and saved.");
+      try {
+        localStorage.setItem("storyforge-story-bible", JSON.stringify({world:null,characters:[]}));
+        const stored = JSON.parse(localStorage.getItem("storyforge-projects") || "[]");
+        const projects = Array.isArray(stored) ? stored : [];
+        const titleText = data.title || "Untitled story";
+        const existingIndex = projects.findIndex(p => String(p.title || "") === String(titleText) && String(p.idea || "") === String(idea));
+        const now = new Date().toISOString();
+        const existing = existingIndex >= 0 ? projects[existingIndex] : null;
+        const project = {
+          ...(existing || {}),
+          id: existing ? existing.id : Date.now(),
+          title: titleText,
+          idea,
+          data,
+          updatedAt: now,
+          workspace: {
+            productionBible: JSON.parse(localStorage.getItem("storyforge-production-bible") || "{}"),
+            productionState: JSON.parse(localStorage.getItem("storyforge-production-state") || "{}"),
+            storyBible: JSON.parse(localStorage.getItem("storyforge-story-bible") || '{"world":null,"characters":[]}')
+          }
+        };
+        const next = [project, ...projects.filter((p, i) => i !== existingIndex)].slice(0, 20);
+        localStorage.setItem("storyforge-projects", JSON.stringify(next));
+      } catch (storageError) {
+        throw new Error("The story was generated, but your browser could not save it. Check browser storage settings and try Save project again.");
+      }
+      if (typeof window.renderProjects === "function") window.renderProjects();
+      if (typeof window.openProjectWorkspace === "function") {
+        const projects = JSON.parse(localStorage.getItem("storyforge-projects") || "[]");
+        const saved = projects.find(p => String(p.title || "") === String(data.title || "Untitled story") && String(p.idea || "") === String(idea));
+        if (saved) window.openProjectWorkspace(saved.id);
+      }
+      notify(data.generationWarning || "Project saved on this device. Open it from Your Projects.");
       results?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       notify(error && error.message ? error.message : "Story creation failed. Please try again.");
