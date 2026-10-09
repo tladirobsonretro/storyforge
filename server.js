@@ -501,7 +501,8 @@ window.addEventListener("error",function(e){const t=document.getElementById("toa
 window.addEventListener("unhandledrejection",function(e){const t=document.getElementById("toast");if(t){t.textContent="Action failed: "+(e.reason?.message||String(e.reason||"unknown error"));t.style.display="block"}});
 function focusPrompt(){document.getElementById("idea").focus()}
 function saveProject(){if(!currentStory){toast("Create a story before saving.");return}const projects=readProjects();projects.unshift({id:Date.now(),title:currentStory.title,idea:currentStory.idea,data:currentStory.data});try{localStorage.setItem("storyforge-projects",JSON.stringify(projects.slice(0,20)))}catch(e){toast("Could not save locally. Browser storage may be full.");return}renderProjects();toast("Project saved.")}
-function renderProjects(){const projects=readProjects();document.getElementById("projectCount").textContent=projects.length+" saved locally in this browser";document.getElementById("projects").innerHTML=projects.map(p=>"<div class='project' onclick='loadProject("+p.id+")' style='cursor:pointer'><div><strong>"+p.title+"</strong><small>"+p.idea+"</small></div><span class='status'>OPEN</span></div>").join("")+"<div class='project'><div><strong>StoryForge pipeline</strong><small>World → Character → Story → Asset → Storyboard → Video</small></div><span class='status'>BUILDING</span></div>"}
+function renderProjects(){const projects=readProjects();document.getElementById("projectCount").textContent=projects.length+" saved locally in this browser";document.getElementById("projects").innerHTML=projects.map(p=>"<div class='project' onclick='loadProject("+Number(p.id)+")' style='cursor:pointer'><div><strong>"+escapeHtml(p.title||"Untitled story")+"</strong><small>"+escapeHtml(p.idea||"")+"</small></div><div style='display:flex;align-items:center;gap:8px'><span class='status'>OPEN</span><button type='button' class='copy-btn' style='padding:7px 10px;border-color:#733b3b;color:#ffb5b5' onclick='event.stopPropagation();deleteProject("+Number(p.id)+")'>Delete</button></div></div>").join("")+"<div class='project'><div><strong>StoryForge pipeline</strong><small>World → Character → Story → Asset → Storyboard → Video</small></div><span class='status'>BUILDING</span></div>"}
+function deleteProject(id){const projects=readProjects();const target=projects.find(p=>Number(p.id)===Number(id));if(!target){toast("That saved story could not be found.");return}if(!window.confirm("Delete \""+String(target.title||"Untitled story").replace(/[\"\\]/g,"")+" \"? This cannot be undone."))return;localStorage.setItem("storyforge-projects",JSON.stringify(projects.filter(p=>Number(p.id)!==Number(id))));renderProjects();toast("Saved story deleted.")}
 function loadProject(id){const projects=readProjects();const p=projects.find(x=>x.id===id);if(p){renderStory(p.data,p.idea);toast("Project loaded.")}}
 function renderStory(data,idea){currentStory={title:data.title,idea:idea,data:data};document.getElementById("resultTitle").textContent=data.title;document.getElementById("logline").textContent=data.logline;document.getElementById("world").textContent=data.world;document.getElementById("characters").innerHTML=data.characters.map(c=>"<div class='episode'><strong>"+c.name+"</strong><span>"+c.role+"</span></div>").join("");document.getElementById("episodes").innerHTML=data.episodes.map(e=>"<div class='episode'><strong>"+e.number+". "+e.title+"</strong><span>"+e.summary+"</span></div>").join("");document.getElementById("shots").innerHTML=data.scenes.map(s=>"<div class='shot'><b>SHOT "+s.shot+"</b><div>"+s.camera+"</div><div>"+s.action+"</div></div>").join("");document.getElementById("results").classList.add("show")}
 function initWorkspace(){renderProjects()}
@@ -652,7 +653,7 @@ async function generateVideo(){
    "SCENE CONTEXT: "+JSON.stringify(scene),
    "STORYBOARD SHOT: "+(shotDescription||"A cinematic establishing moment in the story world."),
    "Use coherent continuous motion, stable character identity, clear composition, natural movement and a deliberate camera move. No titles, captions, logos or watermarks."
-  ].join("\n");
+  ].join("\\n");
   const duration=Math.max(2,Math.min(10,Number(document.getElementById("videoDuration")?.value||4)));
   const response=await fetch("/api/video",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt,model:"wan",duration})});
   const data=await response.json();
@@ -705,7 +706,7 @@ async function createStory(){
 
 // Make primary tool actions reliable and surface failures instead of silently doing nothing.
 Object.assign(window, {
- showTool, showSavedStories, buildWorld, buildCharacter, generateCharacterReference,
+ showTool, showSavedStories, deleteProject, buildWorld, buildCharacter, generateCharacterReference,
  generateScene, buildStoryboard, buildVideoPlan, generateVideo, buildAsset, generateImage,
  focusPrompt, toast, createStory, saveProject
 });
