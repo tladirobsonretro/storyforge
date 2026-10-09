@@ -32,6 +32,7 @@
     currentShots = (data.shots || []).map(shot => ({...shot, visualPrompt: [STYLE_LOCK, shot.visualPrompt || "", "WORLD CONTEXT: "+payload.worldBible, "CHARACTER CONTINUITY: "+payload.characterBible, "SCENE ACTION: "+(shot.action||payload.premise), "Strictly painterly stylized animation, no photorealism, no hyperrealism, no live action."].filter(Boolean).join("\n")}));
     animatedClips = {};
     generatedFrames = {};
+    persistProductionState();
     const output = document.getElementById("toolOutput");
     output.style.display = "block";
     output.innerHTML =
