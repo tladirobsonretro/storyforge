@@ -338,6 +338,12 @@ app.get("/api/video-clip/:id", (req, res) => {
   res.sendFile(item.path);
 });
 
+app.get("/api/video-status", (_req, res) => {
+  const configured = Boolean(String(process.env.POLLINATIONS_API_KEY || "").trim());
+  res.setHeader("Cache-Control", "no-store");
+  res.json({ configured, message: configured ? "Video provider connection is configured." : "Video generation is not connected: POLLINATIONS_API_KEY is missing from the Render service environment." });
+});
+
 app.post("/api/video", async (req, res) => {
   if (!process.env.POLLINATIONS_API_KEY) return res.status(503).json({ error: "Video generation is not connected yet. Add POLLINATIONS_API_KEY in Render to enable it." });
   const prompt = String(req.body?.prompt || "").trim();
