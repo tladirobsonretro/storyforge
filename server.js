@@ -755,7 +755,7 @@ document.addEventListener("click", function(event) {
  }
 }, true);
 migrateLegacyCharacter(); initWorkspace(); renderCharacterLibrary(); window.addEventListener("beforeunload",persistActiveProjectState);
-</script><script src="/story-create.js?v=2"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js?v=2"></script><script src="/pipeline.js?v=1"></script></body></html>`);
+</script><script src="/story-create.js?v=3"></script><script src="/story-save.js?v=1"></script><script src="/storyboard-board.js?v=2"></script><script src="/pipeline.js?v=1"></script></body></html>`);
 });
 
 app.listen(PORT, () => console.log(`StoryForge running on port ${PORT}`));
